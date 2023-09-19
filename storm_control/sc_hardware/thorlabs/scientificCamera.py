@@ -4,8 +4,6 @@ Captured pictures for ThorLab Scientific Line of Cameras
 
 Collin Bolles 9/23
 """
-
-import ctypes
 import ctypes.util
 import ctypes.wintypes
 import numpy
@@ -15,23 +13,12 @@ import numpy as np
 
 import time
 
-import storm_control.sc_library.hdebug as hdebug
-
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
 # Import fitting libraries.
 
 # Numpy fitter, this should always be available.
 import storm_control.sc_hardware.utility.np_lock_peak_finder as npLPF
-
-# Finding/fitting using the storm-analysis project.
-saLPF = None
-try:
-    import storm_control.sc_hardware.utility.sa_lock_peak_finder as saLPF
-except ModuleNotFoundError as mnfe:
-    print(">> Warning! Storm analysis lock fitting module not found. <<")
-    print(mnfe)
-    pass
 
 # Finding using the storm-analysis project, fitting using image correlation.
 cl2DG = None
@@ -484,10 +471,6 @@ class CameraQPDScipyFit(CameraQPD):
         else:
             return [False, False, False, False]
 
-
-
-
-        
 # Testing
 if (__name__ == "__main__"):
     camera = Camera(0, 'C:\\Users\\RPI\\Desktop\\AlgoBioLab\\ThorLabsDLL')
