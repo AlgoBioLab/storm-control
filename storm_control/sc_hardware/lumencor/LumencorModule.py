@@ -24,6 +24,11 @@ class LumencorLaserFunctionality(amplitudeModule.AmplitudeFunctionalityBuffered)
     def onOff(self, power, state):
         # FIXME: We could build up a back-log here if the user
         #        gets carried away toggling the shutter button.
+	# Turn on laser 
+        self.mustRun(task = self.laser.setLaserOnOff,
+                     args=[state])
+
+	# Set power level
         self.mustRun(task = self.laser.setPower,
                      args = [0.01 * power],
                      ret_signal = None)
