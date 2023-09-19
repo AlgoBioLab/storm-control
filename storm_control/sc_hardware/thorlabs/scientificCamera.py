@@ -74,6 +74,10 @@ def dll_path_config(dll_folder_location: str):
     except AttributeError:
         pass
 
+class CameraInfo:
+    def __init__(self, nMaxWidth, nMaxHeight):
+        self.nMaxWidth = nMaxWidth
+        self.nMaxHeight = nMaxHeight
 
 class Camera:
     """
@@ -83,6 +87,9 @@ class Camera:
         # Initialize the SDK
         dll_path_config(dll_location)
         self.sdk = TLCameraSDK()
+
+        # TODO: Grab info from the camera
+        self.info = CameraInfo(1440, 1080)
 
         # Try to find the camera
         # TODO: Improve access beyond index
@@ -95,10 +102,12 @@ class Camera:
 
         # Add in camera settings
         # TODO: Load in from settings file
-        self.camera.roi = (700, 828, 200, 100)
         self.camera.exposure_time_us = 11000
         self.camera.frames_per_trigger_zero_for_unlimited = 0
         self.camera.image_poll_timeout_ms = 1000
+        
+        self.camera.roi = (700, 828, 875, 903)
+        
         self.camera.arm(2)
         self.camera.issue_software_trigger()
 
@@ -120,6 +129,9 @@ class Camera:
         """
         Copy an image from the camera into self.data and return self.data
         """
+        # TODO: Find out why after shutdown a frame is attempted to be captured
+        if not self.sdk._is_sdk_open:
+            return None
         frame = self.camera.get_pending_frame_or_null()
         if frame is None:
             # TODO: More cleanly handle failed frame grabs
@@ -238,6 +250,7 @@ class CameraQPD(object):
         # Set camera AOI.
         self.x_width = x_width
         self.y_width = y_width
+        print(self.x_width, self.y_width)
         self.setAOI()
 
         # Run at maximum speed.
@@ -409,114 +422,6 @@ class CameraQPD(object):
         # if we are averaging.
         else:
             return [power, 2.0, 2.0*((dist1 + dist2) - self.zero_dist)]
-
-
-class CameraQPDCorrFit(CameraQPD):
-    """
-    This version uses storm-analyis to do the peak finding and
-    image correlation to do the peak fitting.
-    """
-    def __init__(self, **kwds):
-        super().__init__(**kwds)
-
-        assert (cl2DG is not None), "Correlation fitting not available."
-
-        self.fit_hl = None
-        self.fit_hr = None
-
-    def doFit(self, data):
-        dist1 = 0
-        dist2 = 0
-        self.x_off1 = 0.0
-        self.y_off1 = 0.0
-        self.x_off2 = 0.0
-        self.y_off2 = 0.0
-
-        if self.fit_hl is None:
-            roi_size = int(3.0 * self.sigma)
-            self.fit_hl = cl2DG.CorrLockFitter(roi_size = roi_size,
-                                               sigma = self.sigma,
-                                               threshold = 10)
-            self.fit_hr = cl2DG.CorrLockFitter(roi_size = roi_size,
-                                               sigma = self.sigma,
-                                               threshold = 10)
-
-        total_good = 0
-        [x1, y1, status] = self.fit_hl.findFitPeak(data[:,:self.half_x])
-        if status:
-            total_good += 1
-            self.x_off1 = x1 - self.half_y
-            self.y_off1 = y1 - self.half_x
-            dist1 = abs(self.y_off1)
-                
-        [x2, y2, status] = self.fit_hr.findFitPeak(data[:,-self.half_x:])
-        if status:
-            total_good += 1
-            self.x_off2 = x2 - self.half_y
-            self.y_off2 = y2
-            dist2 = abs(self.y_off2)
-
-        return [total_good, dist1, dist2]
-
-    def shutDown(self):
-        super().shutDown()
-        
-        if self.fit_hl is not None:
-            self.fit_hl.cleanup()
-            self.fit_hr.cleanup()
-            
-
-class CameraQPDSAFit(CameraQPD):
-    """
-    This version uses the storm-analysis project to do the fitting.
-    """
-    def __init__(self, **kwds):
-        super().__init__(**kwds)
-
-        assert (saLPF is not None), "Storm-analysis fitting not available."
-
-        self.fit_hl = None
-        self.fit_hr = None
-
-    def doFit(self, data):
-        dist1 = 0
-        dist2 = 0
-        self.x_off1 = 0.0
-        self.y_off1 = 0.0
-        self.x_off2 = 0.0
-        self.y_off2 = 0.0
-
-        if self.fit_hl is None:
-            self.fit_hl = saLPF.LockPeakFinder(offset = 5.0,
-                                               sigma = self.sigma,
-                                               threshold = 10)
-            self.fit_hr = saLPF.LockPeakFinder(offset = 5.0,
-                                               sigma = self.sigma,
-                                               threshold = 10)
-
-        total_good = 0
-        [x1, y1, status] = self.fit_hl.findFitPeak(data[:,:self.half_x])
-        if status:
-            total_good += 1
-            self.x_off1 = x1 - self.half_y
-            self.y_off1 = y1 - self.half_x
-            dist1 = abs(self.y_off1)
-                
-        [x2, y2, status] = self.fit_hr.findFitPeak(data[:,-self.half_x:])
-        if status:
-            total_good += 1
-            self.x_off2 = x2 - self.half_y
-            self.y_off2 = y2
-            dist2 = abs(self.y_off2)
-
-        return [total_good, dist1, dist2]
-
-    def shutDown(self):
-        super().shutDown()
-        
-        if self.fit_hl is not None:
-            self.fit_hl.cleanup()
-            self.fit_hr.cleanup()
 
             
 class CameraQPDScipyFit(CameraQPD):
