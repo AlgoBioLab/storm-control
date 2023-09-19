@@ -11,7 +11,7 @@ import storm_control.hal4000.halLib.halMessage as halMessage
 
 import storm_control.sc_hardware.baseClasses.hardwareModule as hardwareModule
 import storm_control.sc_hardware.baseClasses.lockModule as lockModule
-import storm_control.sc_hardware.thorlabs.uc480Camera as uc480Camera
+import storm_control.sc_hardware.thorlabs.scientificCamera as uc480Camera
 
 
 class UC480QPDCameraFunctionality(hardwareModule.BufferedFunctionality, lockModule.QPDCameraFunctionalityMixin):
@@ -127,7 +127,6 @@ class UC480Camera(hardwareModule.HardwareModule):
         self.camera_functionality = None
 
         configuration = module_params.get("configuration")
-        uc480Camera.loadDLL(configuration.get("uc480_dll"))
 
         # Use the storm-analysis project for finding and image correlation for
         # fitting. This is hopefully less sensitive to the fringes than a

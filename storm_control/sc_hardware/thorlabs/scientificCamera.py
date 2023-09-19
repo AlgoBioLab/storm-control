@@ -1,14 +1,8 @@
 #!/usr/bin/env python
 """
-Captures pictures from a Thorlabs uc480 (software) series cameras.
+Captured pictures for ThorLab Scientific Line of Cameras
 
-FIXME: This only works with the uc480 Version 4.20 (or earlier) software.
-       It will appear to work, then crash if you try and run it using
-       ThorCam. If you install ThorCam you'll need to uninstall it
-       first before installing the uc480 software. This software is
-       available under the "Archive" tag in the ThorCam Software page.
-
-Hazen 08/16
+Collin Bolles 9/23
 """
 
 import ctypes
@@ -16,10 +10,14 @@ import ctypes.util
 import ctypes.wintypes
 import numpy
 import os
+import sys
+import numpy as np
 
 import time
 
 import storm_control.sc_library.hdebug as hdebug
+
+from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
 
 # Import fitting libraries.
 
@@ -47,261 +45,146 @@ except OSError as ose:
     print(ose)
     pass
 
-    
-uc480 = None
-
-Handle = ctypes.wintypes.HANDLE
-
-# some definitions
-IS_AOI_IMAGE_GET_AOI = 0x0002
-IS_AOI_IMAGE_SET_AOI = 0x0001
-IS_DONT_WAIT = 0
-IS_ENABLE_ERR_REP = 1
-IS_GET_STATUS = 0x8000
-IS_IGNORE_PARAMETER = -1
-IS_SEQUENCE_CT = 2
-IS_SET_CM_Y8 = 6
-IS_SET_GAINBOOST_OFF = 0x0000
-IS_SUCCESS = 0
-IS_TRIGGER_TIMEOUT = 0
-IS_WAIT = 1
-
-class CameraInfo(ctypes.Structure):
-    """
-    The uc480 camera info structure.
-    """
-    _fields_ = [("CameraID", ctypes.wintypes.DWORD),
-                ("DeviceID", ctypes.wintypes.DWORD),
-                ("SensorID", ctypes.wintypes.DWORD),
-                ("InUse", ctypes.wintypes.DWORD),
-                ("SerNo", ctypes.c_char * 16),
-                ("Model", ctypes.c_char * 16),
-                ("Reserved", ctypes.wintypes.DWORD * 16)]
-
-class CameraProperties(ctypes.Structure):
-    """
-    The uc480 camera properties structure.
-    """
-    _fields_ = [("SensorID", ctypes.wintypes.WORD),
-                ("strSensorName", ctypes.c_char * 32),
-                ("nColorMode", ctypes.c_char),
-                ("nMaxWidth", ctypes.wintypes.DWORD),
-                ("nMaxHeight", ctypes.wintypes.DWORD),
-                ("bMasterGain", ctypes.wintypes.BOOL),
-                ("bRGain", ctypes.wintypes.BOOL),
-                ("bGGain", ctypes.wintypes.BOOL),
-                ("bBGain", ctypes.wintypes.BOOL),
-                ("bGlobShutter", ctypes.wintypes.BOOL),
-                ("Reserved", ctypes.c_char * 16)]
-
-class AOIRect(ctypes.Structure):
-    """
-    The uc480 camera AOI structure.
-    """
-    _fields_ = [("s32X", ctypes.wintypes.INT),
-                ("s32Y", ctypes.wintypes.INT),
-                ("s32Width", ctypes.wintypes.INT),
-                ("s32Height", ctypes.wintypes.INT)]
-
 
 # Helper functions
-
-def check(fn_return, fn_name = ""):
-    if not (fn_return == IS_SUCCESS):
-        hdebug.logText("uc480: Call failed with error " + str(fn_return) + " " + fn_name)
-        #print "uc480: Call failed with error", fn_return, fn_name
-
-def create_camera_list(num_cameras):
+def dll_path_config(dll_folder_location: str):
     """
-    Creates a empty CameraList structure.
+    Adds the locations of the Native DLLs to the PATH.
+    Expects to be provided a folder with the following two sub folder
+    
+    * 64_lib
+    * 32_lib
+
+    This code is based on the ThorLabs provided `windows_setup` script
     """
-    class CameraList(ctypes.Structure):
-        _fields_ = [("Count", ctypes.c_long),
-                    ("Cameras", CameraInfo*num_cameras)]
-    a_list = CameraList()
-    a_list.Count = num_cameras
-    return a_list
+    is_64bits = sys.maxsize > 2**32
 
-def loadDLL(dll_name):
-    global uc480
-    if uc480 is None:
-        uc480 = ctypes.cdll.LoadLibrary(dll_name)
+    # Determine if the path should point to the 64 bit dlls or 32 bit dlls
+    path_to_dlls = dll_folder_location + os.sep
+    if is_64bits:
+        path_to_dlls += '64_lib'
+    else:
+        path_to_dlls += '32_lib'
+
+    os.environ['PATH'] = path_to_dlls + os.pathsep + os.environ['PATH']
+
+    try:
+        # Python 3.8 introduces a new method to specify dll directory
+        os.add_dll_directory(path_to_dlls)
+    except AttributeError:
+        pass
 
 
-class Camera(Handle):
+class Camera:
     """
     UC480 Camera Interface Class
     """
-    def __init__(self, camera_id, ini_file = "uc480_settings.ini"):
-        super().__init__(camera_id)
+    def __init__(self, camera_id, dll_location: str):
+        # Initialize the SDK
+        dll_path_config(dll_location)
+        self.sdk = TLCameraSDK()
 
-        # Initialize camera.
-        check(uc480.is_InitCamera(ctypes.byref(self), ctypes.wintypes.HWND(0)), "is_InitCamera")
-        #check(uc480.is_SetErrorReport(self, IS_ENABLE_ERR_REP))
+        # Try to find the camera
+        # TODO: Improve access beyond index
+        available_cameras = self.sdk.discover_available_cameras()
+        if len(available_cameras) < camera_id:
+            raise 'ThorLabs camera at the given index not found'
 
-        # Get some information about the camera.
-        self.info = CameraProperties()
-        check(uc480.is_GetSensorInfo(self, ctypes.byref(self.info)), "is_GetSensorInfo")
-        self.im_width = self.info.nMaxWidth
-        self.im_height = self.info.nMaxHeight
+        # Grab the camera
+        self.camera = self.sdk.open_camera(available_cameras[camera_id])
 
-        # Initialize some general camera settings.
-        if (os.path.exists(ini_file)):
-            self.loadParameters(ini_file)
-            hdebug.logText("uc480 loaded parameters file " + ini_file, to_console = False)
-        else:
-            check(uc480.is_SetColorMode(self, IS_SET_CM_Y8), "is_SetColorMode")
-            check(uc480.is_SetGainBoost(self, IS_SET_GAINBOOST_OFF), "is_SetGainBoost")
-            check(uc480.is_SetGamma(self, 1), "is_SetGamma")
-            check(uc480.is_SetHardwareGain(self,
-                                           0,
-                                           IS_IGNORE_PARAMETER,
-                                           IS_IGNORE_PARAMETER,
-                                           IS_IGNORE_PARAMETER),
-                  "is_SetHardwareGain")
-            hdebug.logText("uc480 used default settings.", to_console = False)
-
-        # Setup capture parameters.
-        self.bitpixel = 8     # This is correct for a BW camera anyway..
-        self.cur_frame = 0
-        self.data = False
-        self.id = 0
-        self.image = False
-        self.running = False
-        self.setBuffers()
+        # Add in camera settings
+        # TODO: Load in from settings file
+        self.camera.roi = (700, 828, 200, 100)
+        self.camera.exposure_time_us = 11000
+        self.camera.frames_per_trigger_zero_for_unlimited = 0
+        self.camera.image_poll_timeout_ms = 1000
+        self.camera.arm(2)
+        self.camera.issue_software_trigger()
 
     def captureImage(self):
         """
         Wait for the next frame from the camera, then call self.getImage().
         """
-        check(uc480.is_FreezeVideo(self, IS_WAIT), "is_FreezeVideo")
         return self.getImage()
 
     def captureImageTest(self):
         """
         For testing..
         """
-        check(uc480.is_FreezeVideo(self, IS_WAIT), "is_FreezeVideo")
-
+        
     def getCameraStatus(self, status_code):
-        return uc480.is_CameraStatus(self, status_code, IS_GET_STATUS, "is_CameraStatus")
+        return True
 
     def getImage(self):
         """
         Copy an image from the camera into self.data and return self.data
         """
-        check(uc480.is_CopyImageMem(self, self.image, self.id, ctypes.c_char_p(self.data.ctypes.data)), "is_CopyImageMem")
-        return self.data
+        frame = self.camera.get_pending_frame_or_null()
+        if frame is None:
+            # TODO: More cleanly handle failed frame grabs
+            raise 'Failed to get a frame'
+        return np.copy(frame.image_buffer)
 
     def getNextImage(self):
         """
         Waits until an image is available from the camera, then 
         call self.getImage() to return the new image.
         """
-        print(self.cur_frame, self.getCameraStatus(IS_SEQUENCE_CT))
-        while (self.cur_frame == self.getCameraStatus(IS_SEQUENCE_CT)):
-            print("waiting..")
-            time.sleep(0.05)
-        self.cur_frame += 1
         return self.getImage()
 
     def getSensorInfo(self):
         return self.info
 
     def getTimeout(self):
-        nMode = IS_TRIGGER_TIMEOUT
-        pTimeout = ctypes.c_int(1)
-        check(uc480.is_GetTimeout(self,
-                                  ctypes.c_int(nMode),
-                                  ctypes.byref(pTimeout)),
-              "is_GetTimeout")
-        return pTimeout.value
+        return 1
 
     def loadParameters(self, filename):
-        check(uc480.is_LoadParameters(self,
-                                      ctypes.c_char_p(filename.encode())))
+        return None
 
     def saveParameters(self, filename):
         """
         Save the current camera settings to a file.
         """
-        check(uc480.is_SaveParameters(self,
-                                      ctypes.c_char_p(filename.encode())))
 
     def setAOI(self, x_start, y_start, width, height):
         # x and y start have to be multiples of 2.
-        x_start = int(x_start/2)*2
-        y_start = int(y_start/2)*2
-
-        self.im_width = width
-        self.im_height = height
-        aoi_rect = AOIRect(x_start, y_start, width, height)
-        check(uc480.is_AOI(self,
-                           IS_AOI_IMAGE_SET_AOI,
-                           ctypes.byref(aoi_rect),
-                           ctypes.sizeof(aoi_rect)),
-              "is_AOI")
-        self.setBuffers()
+        # self.camera.roi = (x_start, y_start, width, height)
+        return None
 
     def setBuffers(self):
         """
         Based on the AOI, create the internal buffer that the camera will use and
         the intermediate buffer that we will copy the data from the camera into.
         """
-        self.data = numpy.zeros((self.im_height, self.im_width), dtype = numpy.uint8)
-        if self.image:
-            check(uc480.is_FreeImageMem(self, self.image, self.id))
-        self.image = ctypes.c_char_p()
-        self.id = ctypes.c_int()
-        check(uc480.is_AllocImageMem(self,
-                                     ctypes.c_int(self.im_width),
-                                     ctypes.c_int(self.im_height),
-                                     ctypes.c_int(self.bitpixel),
-                                     ctypes.byref(self.image),
-                                     ctypes.byref(self.id)),
-              "is_AllocImageMem")
-        check(uc480.is_SetImageMem(self, self.image, self.id), "is_SetImageMem")
 
     def setFrameRate(self, frame_rate = 1000, verbose = False):
-        new_fps = ctypes.c_double()
-        check(uc480.is_SetFrameRate(self,
-                                    ctypes.c_double(frame_rate),
-                                    ctypes.byref(new_fps)),
-              "is_SetFrameRate")
-        if verbose:
-            print("uc480: Set frame rate to {0:.1f} FPS".format(new_fps.value))
+        return None
 
     def setPixelClock(self, pixel_clock_MHz):
         """
         43MHz seems to be the max for this camera?
         """
-        check(uc480.is_SetPixelClock(self,
-                                     ctypes.c_int(pixel_clock_MHz)))
 
     def setTimeout(self, timeout):
-        nMode = IS_TRIGGER_TIMEOUT
-        check(uc480.is_SetTimeout(self,
-                                  ctypes.c_int(nMode),
-                                  ctypes.c_int(timeout)),
-              "is_SetTimeout")
+        return None
 
     def shutDown(self):
         """
         Shut down the camera.
         """
-        check(uc480.is_ExitCamera(self), "is_ExitCamera")
+        self.camera.dispose()
+        self.sdk.dispose()
 
     def startCapture(self):
         """
         Start video capture (as opposed to single frame capture, which is done with self.captureImage().
         """
-        check(uc480.is_CaptureVideo(self, IS_DONT_WAIT), "is_CaptureVideo")
 
     def stopCapture(self):
         """
         Stop video capture.
         """
-        check(uc480.is_StopLiveVideo(self, IS_WAIT), "is_StopLiveVideo")
 
 
 class CameraQPD(object):
@@ -343,7 +226,7 @@ class CameraQPD(object):
         ini_file = os.path.join(os.path.dirname(os.path.abspath(__file__)), ini_file)
 
         # Open camera
-        self.cam = Camera(camera_id, ini_file = ini_file)
+        self.cam = Camera(0, 'C:\\Users\\RPI\\Desktop\\AlgoBioLab\\ThorLabsDLL')
 
         # Set timeout
         self.cam.setTimeout(1)
@@ -702,59 +585,10 @@ class CameraQPDScipyFit(CameraQPD):
         
 # Testing
 if (__name__ == "__main__"):
+    camera = Camera(0, 'C:\\Users\\RPI\\Desktop\\AlgoBioLab\\ThorLabsDLL')
+    camera.getImage()
 
-    from PIL import Image
-
-    loadDLL("c:/windows/system32/uc480_64.dll")
-
-    cam = Camera(1)
-    reps = 1000
-
-    if False:
-        cam.setAOI(772, 566, 200, 200)
-        cam.setFrameRate(verbose = True)
-        for i in range(100):
-            print("start", i)
-            for j in range(100):
-                image = cam.captureImage()
-            print(" stop")
-
-        #im = Image.fromarray(image)
-        #im.save("temp.png")
-
-    if False:
-        cam.setAOI(100, 100, 300, 300)
-        cam.setPixelClock()
-        cam.setFrameRate()
-        cam.startCapture()
-        st = time.time()
-        for i in range(reps):
-            #print i
-            image = cam.getNextImage()
-            #print i, numpy.sum(image)
-        print("time:", time.time() - st)
-        cam.stopCapture()
-
-    if True:
-        cam.setAOI(100, 100, 700, 100)
-        cam.setPixelClock(25)
-        cam.setFrameRate(verbose = True)
-        st = time.time()
-        print("starting")
-        for i in range(reps):
-            #print i
-            image = cam.captureImage()
-            #print(i, numpy.sum(image))
-        elapsed_time = time.time() - st
-        print("{0:0d} frames in {1:.3f} seconds, {2:.3f} FPS".format(reps, elapsed_time, reps/elapsed_time))
-
-    if False:
-        image = cam.captureImage()
-        im = Image.fromarray(image)
-        im.save("temp.png")
-        cam.saveParameters("cam1.ini")
-
-    cam.shutDown()
+    camera.shutDown()
 
 #
 # The MIT License
