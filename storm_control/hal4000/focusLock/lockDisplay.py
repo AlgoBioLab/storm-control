@@ -346,10 +346,8 @@ class QQPDCamDisplay(QCamDisplay):
         # Update the camera image.
         np_data = qpd_data["image"]
         h, w = np_data.shape
-        # TODO: Move image clipping to camera logic
-        image = ((np_data - np_data.min()) * (1/(np_data.max() - np_data.min()) * 255)).astype('uint8')
-        self.camera_image = QtGui.QImage(image.data, w, h, QtGui.QImage.Format_Indexed8)
-        self.camera_image.ndarray = image
+        self.camera_image = QtGui.QImage(np_data.data, w, h, QtGui.QImage.Format_Indexed8)
+        self.camera_image.ndarray = np_data
         for i in range(256):
             self.camera_image.setColor(i, QtGui.QColor(i,i,i).rgb())
 

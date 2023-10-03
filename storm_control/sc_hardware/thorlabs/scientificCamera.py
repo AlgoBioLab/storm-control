@@ -123,7 +123,10 @@ class Camera:
         if frame is None:
             # TODO: More cleanly handle failed frame grabs
             raise 'Failed to get a frame'
-        return np.copy(frame.image_buffer)
+        image = np.copy(frame.image_buffer)
+
+        # Convert an np array with values between 0 - 255
+        return ((image - image.min()) * (1/(image.max() - image.min()) * 255)).astype('uint8')
 
     def getNextImage(self):
         """
