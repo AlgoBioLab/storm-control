@@ -1,6 +1,10 @@
 import abc
 import numpy as np
 from typing import Tuple
+import storm_control.sc_hardware.baseClasses.hardwareModule as hardwareModule
+import storm_control.sc_hardware.baseClasses.lockModule as lockModule
+import storm_control.hal4000.halLib.halMessage as halMessage
+
 
 class Camera(metaclass=abc.ABCMeta):
     """
@@ -49,3 +53,31 @@ class Camera(metaclass=abc.ABCMeta):
         be created
         """
         pass
+
+
+class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionalityMixin, hardwareModule.BufferedFunctionality):
+    def __init__(self, configuration):
+        """
+        TODO: Determine how the module comes out from the configuration
+        """
+
+    # QPDCameraFunctionalityMixin
+    def adjustAOI(self, dx, dy):
+        pass
+
+    def adjustZeroDist(self, inc):
+        pass
+
+    def changeFitMode(self, mode):
+        pass
+
+    def getMinimumInc(self):
+        pass
+
+    def getOffset(self):
+        pass
+
+    def getFunctionality(self, message):
+        if (message.getData()["name"] == self.module_name):
+            message.addResponse(halMessage.HalMessageResponse(source = self.module_name,
+                                                              data = {"functionality" : self}))
