@@ -2,6 +2,7 @@ import abc
 import numpy as np
 from typing import Tuple
 from storm_control.hal4000.halLib.halFunctionality import HalFunctionality
+from storm_control.hal4000.halLib.halModule import HalModule
 import storm_control.sc_hardware.baseClasses.hardwareModule as hardwareModule
 import storm_control.sc_hardware.baseClasses.lockModule as lockModule
 import storm_control.hal4000.halLib.halMessage as halMessage
@@ -64,7 +65,7 @@ class Camera(hardwareModule.HardwareModule, HalFunctionality): # metaclass=abc.A
 
 
 
-class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionalityMixin, metaclass=abc.ABCMeta):
+class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionalityMixin):
     CAMERA_MODULE_ERROR = 'Configuration has not completed successfully, camera for QPD emulation not found'
 
     def __init__(self, module_params = None, qt_settings = None, **kwds):
@@ -80,18 +81,26 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         if self.camera_module is None:
             raise Exception('Camera object not provided to CameraQPD')
 
-        # Make the request for the camera functionality
-        self.sendMessage(halMessage.HalMessage(m_type='get functionality',
-                                               data={ 'name': self.camera_module }))
+        # Grab the fit module
+        self.fit_approach = None
+        self.fit_module = configuration.get('fit', None)
+        if self.fit_module is None:
+            raise Exception('Fit module not provided to CameraQPD')
 
     def handleResponse(self, message, response) -> None:
-        if message.isType('get functionality'):
+        if message.isType('get functionality') and response.source == self.camera_module:
             self.camera = response.getData()['functionality']
+        elif message.isType('get functionality') and response.source == self.fit_module:
+            self.fit_approach = response.getData()['functionality']
 
     def processMessage(self, message) -> None:
         if message.isType('configuration'):
+            # Request the camera object
             self.sendMessage(halMessage.HalMessage(m_type='get functionality',
-                                               data={ 'name': self.camera_module }))
+                                                   data={ 'name': self.camera_module }))
+            # Request the fit object
+            self.sendMessage(halMessage.HalMessage(m_type='get functionality',
+                                                   data={ 'name': self.fit_module }))
 
 
     # QPDCameraFunctionalityMixin
@@ -113,20 +122,24 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
 
     def getFunctionality(self, message):
         if (message.getData()["name"] == self.module_name):
+            print(message.source)
             message.addResponse(halMessage.HalMessageResponse(source = self.module_name,
                                                               data = {"functionality" : self}))
 
-    @abc.abstractmethod
-    def doFit(self, data: np.ndarray) -> Tuple:
-        """ Handle the fit calculations on the image data """
-        pass
 
-
-class CameraQPDFit(metaclass=abc.ABCMeta):
+class CameraQPDFit(HalModule, HalFunctionality):
     """ Interface which descibes how fit implementations function """
+    def __init__(self, module_params = None, qt_settings = None, **kwds):
+        super().__init__(**kwds)
+
     @abc.abstractmethod
     def doFit(self, data: np.ndarray) -> Tuple:
         pass
+
+    def processMessage(self, message):
+        if message.isType('get functionality') and message.getData()['name'] == self.module_name:
+            message.addResponse(halMessage.HalMessageResponse(source=self.module_name, data={'functionality': self}))
+
 
 
 class CameraQPDScipyFit(CameraQPDFit):
