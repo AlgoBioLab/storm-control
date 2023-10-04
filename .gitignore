@@ -52,7 +52,7 @@ Desktop.ini
 #############
 ## Doxygen
 #############
-/docs
+#/docs
 
 #############
 ## Android
