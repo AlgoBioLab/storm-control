@@ -63,12 +63,12 @@ class Camera(hardwareModule.HardwareModule, HalFunctionality): # metaclass=abc.A
 
 
 
-class CameraQPD(hardwareModule.HardwareModule): # lockModule.QPDCameraFunctionalityMixin, hardwareModule.BufferedFunctionality):
+class CameraQPD(hardwareModule.HardwareModule): # lockModule.QPDCameraFunctionalityMixin):
+    CAMERA_MODULE_ERROR = 'Configuration has not completed successfully, camera for QPD emulation not found'
+
     def __init__(self, module_params = None, qt_settings = None, **kwds):
-        """
-        TODO: Determine how the module comes out from the configuration
-        """
         super().__init__(**kwds)
+        # Module parameters provided when constructing the module
         assert module_params is not None
 
         configuration = module_params.get("configuration")
@@ -83,7 +83,6 @@ class CameraQPD(hardwareModule.HardwareModule): # lockModule.QPDCameraFunctional
         self.sendMessage(halMessage.HalMessage(m_type='get functionality',
                                                data={ 'name': self.camera_module }))
 
-
     def handleResponse(self, message, response) -> None:
         if message.isType('get functionality'):
             self.camera = response.getData()['functionality']
@@ -96,6 +95,7 @@ class CameraQPD(hardwareModule.HardwareModule): # lockModule.QPDCameraFunctional
 
     # QPDCameraFunctionalityMixin
     def adjustAOI(self, dx, dy):
+        assert self.camera is not None, CameraQPD.CAMERA_MODULE_ERROR
         pass
 
     def adjustZeroDist(self, inc):
