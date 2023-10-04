@@ -1,18 +1,21 @@
 import abc
 import numpy as np
 from typing import Tuple
+from storm_control.hal4000.halLib.halFunctionality import HalFunctionality
 import storm_control.sc_hardware.baseClasses.hardwareModule as hardwareModule
 import storm_control.sc_hardware.baseClasses.lockModule as lockModule
 import storm_control.hal4000.halLib.halMessage as halMessage
 
 
-class Camera(metaclass=abc.ABCMeta):
+class Camera(hardwareModule.HardwareModule, HalFunctionality): # metaclass=abc.ABCMeta):
     """
     The interface which is used for describing the functionality of a camera
     being used for QPD emulation
     """
+    def __init__(self, module_params = None, qt_settings = None, **kwds):
+        super().__init__(**kwds)
 
-    @abc.abstractmethod
+    #@abc.abstractmethod
     def getImage(self) -> np.ndarray:
         """
         Wait for a new frame from the camera and return the data as a numpy
@@ -25,27 +28,27 @@ class Camera(metaclass=abc.ABCMeta):
         """
         pass
 
-    @abc.abstractmethod
+    #@abc.abstractmethod
     def getTimeout(self) -> float:
         """ Get the current timeout set for the camera. Timeout is in seconds """
         pass
 
-    @abc.abstractmethod
+    #@abc.abstractmethod
     def setTimeout(self, timeout: float) -> None:
         """ Set the timeout for capturing a frame. Timeout is in second """
         pass
 
-    @abc.abstractmethod
+    #@abc.abstractmethod
     def getAOI(self) -> Tuple[int, int, int, int]:
         """ Get the area of interest the camera is capturing for, (x_start, y_start, width, height) """
-        pass
+        return(1, 1, 1, 1)
 
-    @abc.abstractmethod
+    #@abc.abstractmethod
     def setAOI(self, x_start: int, y_start: int, width: int, height: int) -> None:
         """ Set the area of interest the camera is capturing for """
         pass
 
-    @abc.abstractmethod
+    #@abc.abstractmethod
     def shutdown(self) -> None:
         """
         Camera specific cleanup logic, assumed that the camera is not
@@ -54,12 +57,42 @@ class Camera(metaclass=abc.ABCMeta):
         """
         pass
 
+    def processMessage(self, message):
+        if message.isType('get functionality') and message.getData()['name'] == self.module_name:
+            message.addResponse(halMessage.HalMessageResponse(source=self.module_name, data={'functionality': self}))
 
-class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionalityMixin, hardwareModule.BufferedFunctionality):
-    def __init__(self, configuration):
+
+
+class CameraQPD(hardwareModule.HardwareModule): # lockModule.QPDCameraFunctionalityMixin, hardwareModule.BufferedFunctionality):
+    def __init__(self, module_params = None, qt_settings = None, **kwds):
         """
         TODO: Determine how the module comes out from the configuration
         """
+        super().__init__(**kwds)
+        assert module_params is not None
+
+        configuration = module_params.get("configuration")
+
+        # Grab the camera module
+        self.camera = None
+        self.camera_module = configuration.get('camera', None)
+        if self.camera_module is None:
+            raise Exception('Camera object not provided to CameraQPD')
+
+        # Make the request for the camera functionality
+        self.sendMessage(halMessage.HalMessage(m_type='get functionality',
+                                               data={ 'name': self.camera_module }))
+
+
+    def handleResponse(self, message, response) -> None:
+        if message.isType('get functionality'):
+            self.camera = response.getData()['functionality']
+
+    def processMessage(self, message) -> None:
+        if message.isType('configuration'):
+            self.sendMessage(halMessage.HalMessage(m_type='get functionality',
+                                               data={ 'name': self.camera_module }))
+
 
     # QPDCameraFunctionalityMixin
     def adjustAOI(self, dx, dy):
