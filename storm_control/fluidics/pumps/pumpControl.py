@@ -553,6 +553,193 @@ class SyringePumpControl(GenericPumpControl):
     def initializePump(self):
         self.pump.initializePump()
 
+
+# ----------------------------------------------------------------------------------------
+# Pressure PumpControl Class Definition
+# ----------------------------------------------------------------------------------------
+class PressurePumpControl(GenericPumpControl):
+    def __init__(self,
+                 parameters = False,
+                 parent = None):
+
+        # NB: This class is written with the assumption that the pressure pump is
+        # coupled with a flow sensor, and that the user defines and controls flow rate,
+        # not pressure value.
+
+        # Pressure pump specific values
+        self.speed_units = parameters.get("speed_units", "mL/min")
+        self.max_speed = parameters.get("max_speed", 100)
+        self.min_speed = parameters.get("min_speed", 0.05)
+
+        #Initialize parent class
+        super().__init__(parameters = parameters, parent = parent)
+
+
+    # ------------------------------------------------------------------------------------
+    # Coerce Speed Entry to Acceptable Range
+    # ------------------------------------------------------------------------------------
+    def coerceSpeed(self):
+        current_speed_text = self.speed_control_entry_box.displayText()
+        try:
+            speed_value = float(current_speed_text)
+            if speed_value < self.min_speed:
+                self.speed_control_entry_box.setText("{0:.2f}".format(self.min_speed))
+                if self.verbose: print("Coerced speed to min_speed")
+            elif speed_value > self.max_speed:
+                self.speed_control_entry_box.setText("{0:.2f}".format(self.max_speed))
+                if self.verbose: print("Coerced speed to max_speed")
+            else:
+                self.speed_control_entry_box.setText("{0:.2f}".format(speed_value))
+        except:
+            print("error in setting speed")
+            assert False
+
+    # ------------------------------------------------------------------------------------
+    # Create GUI Elements
+    # ------------------------------------------------------------------------------------
+    def createGUI(self):
+        # Define main widget
+        self.mainWidget = QtWidgets.QGroupBox()
+        self.mainWidget.setTitle("Pump Controls")
+        self.mainWidgetLayout = QtWidgets.QVBoxLayout(self.mainWidget)
+
+        # Add individual widgets
+        self.pump_identification_label = QtWidgets.QLabel()
+        self.pump_identification_label.setText("No Pump Attached")
+
+        self.flow_status_label= QtWidgets.QLabel()
+        self.flow_status_label.setText("Flow Status:")
+        self.flow_status_display = QtWidgets.QLabel()
+        self.flow_status_display.setText("Unknown")
+        font = QtGui.QFont()
+        font.setPointSize(20)
+        self.flow_status_display.setFont(font)
+
+        self.speed_label = QtWidgets.QLabel()
+        self.speed_label.setText("Flow Rate (" + self.speed_units + ")")
+        self.speed_display = QtWidgets.QLabel()
+        self.speed_display.setText("Unknown")
+        font = QtGui.QFont()
+        font.setPointSize(20)
+        self.speed_display.setFont(font)
+
+        self.speed_control_label = QtWidgets.QLabel()
+        self.speed_control_label.setText("Desired Speed (" + self.speed_units + ")")
+        self.speed_control_entry_box = QtWidgets.QLineEdit()
+        self.speed_control_entry_box.setText("10.00")
+        self.speed_control_entry_box.editingFinished.connect(self.coerceSpeed)
+
+        self.direction_control_label = QtWidgets.QLabel()
+        self.direction_control_label.setText("Desired Direction")
+        self.direction_control = QtWidgets.QComboBox()
+        self.direction_control.addItem("Forward")
+        self.direction_control.addItem("Reverse")
+
+        self.start_flow_button = QtWidgets.QPushButton()
+        self.start_flow_button.setText("Start Flow")
+        self.start_flow_button.clicked.connect(self.handleStartFlow)
+
+        self.stop_flow_button = QtWidgets.QPushButton()
+        self.stop_flow_button.setText("Stop Flow")
+        self.stop_flow_button.clicked.connect(self.handleStopFlow)
+
+        self.mainWidgetLayout.addWidget(self.pump_identification_label)
+        self.mainWidgetLayout.addWidget(self.flow_status_label)
+        self.mainWidgetLayout.addWidget(self.flow_status_display)
+        self.mainWidgetLayout.addWidget(self.speed_label)
+        self.mainWidgetLayout.addWidget(self.speed_display)
+        self.mainWidgetLayout.addWidget(self.speed_control_label)
+        self.mainWidgetLayout.addWidget(self.speed_control_entry_box)
+        self.mainWidgetLayout.addWidget(self.direction_control_label)
+        self.mainWidgetLayout.addWidget(self.direction_control)
+        self.mainWidgetLayout.addWidget(self.start_flow_button)
+        self.mainWidgetLayout.addWidget(self.stop_flow_button)
+        self.mainWidgetLayout.addStretch(1)
+
+        self.menu_names = None
+        self.menu_items = None
+
+        # Define menu items
+        self.calibrate_pump_menu_item = QtWidgets.QAction("Calibrate pump", self)
+        self.calibrate_pump_menu_item.triggered.connect(self.calibratePump)
+
+        self.menu_names = ["Pump"]
+        self.menu_items = [[self.calibrate_pump_menu_item]]
+
+        # Create a dialog box for bringing errors to the users attention
+        self.warning_dialog = None
+
+    # ----------------------------------------------------------------------------------------
+    # Display Status
+    # ----------------------------------------------------------------------------------------
+    def updateStatus(self, status):
+        # Update GUI based on `status` returned from self.pump.getStatus.
+
+        # Pressure pump pump.getStatus should return a `status` shaped thus:
+        flow_status = status[0] # "Flowing" or "Stopped"
+        flow_rate = status[1] # Flow rate
+
+        # Pump identification
+        self.pump_identification_label.setText(self.pump.identification)
+
+        self.flow_status_display.setText(flow_status)
+        self.flow_status_display.setStyleSheet("QLabel { color: green }" if flow_status == "Flowing" else "QLabel { color: red }")
+        self.stop_flow_button.setEnabled(flow_status == "Flowing")
+        self.start_flow_button.setText("Change Flow" if flow_status == "Flowing" else "Start Flow")
+        self.speed_display.setText("%0.2f" % flow_rate )
+
+
+    # ----------------------------------------------------------------------------------------
+    # Handle Change Flow Request
+    # ----------------------------------------------------------------------------------------
+    def handleStartFlow(self):
+        self.pump.startFlow(float(self.speed_control_entry_box.displayText()),
+                            direction = self.direction_control.currentText())
+        time.sleep(0.1)
+        self.pollPumpStatus()
+
+    # ----------------------------------------------------------------------------------------
+    # Handle Change Flow Request
+    # ----------------------------------------------------------------------------------------
+    def handleStopFlow(self):
+        self.pump.stopFlow()
+        time.sleep(0.1)
+        self.pollPumpStatus()
+
+    # ------------------------------------------------------------------------------------
+    # Change pump based on sent command: [direction, speed]
+    # ------------------------------------------------------------------------------------
+    def receiveCommand(self, command):
+        speed = command[1]
+        direction = command[0]
+
+        if speed == 0:
+            self.pump.stopFlow()
+        elif speed < 0:
+            print("Received command with negative speed; stopping pump")
+            self.pump.stopFlow()
+        else:
+            self.pump.startFlow(speed, direction)
+
+    # ------------------------------------------------------------------------------------
+    # Calibrate the pump
+    # ------------------------------------------------------------------------------------
+    def calibratePump(self):
+        self.warning_dialog = QtWidgets.QMessageBox()
+        self.warning_dialog.setIcon(QtWidgets.QMessageBox.Warning)
+
+        self.warning_dialog.setWindowTitle("Reminder")
+        self.warning_dialog.setText("Before calibration: Make sure to first close all channels with approprate caps/fittings")
+        self.warning_dialog.setInformativeText("Proceed?")
+        self.warning_dialog.setStandardButtons(QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        userselected = self.warning_dialog.exec()
+
+        if userselected == QtWidgets.QMessageBox.Yes:
+            self.pump.calibratePump()
+        else:
+            print("User cancelled calibration.")
+
+
 # ----------------------------------------------------------------------------------------
 # Stand Alone Test Class
 # ----------------------------------------------------------------------------------------
