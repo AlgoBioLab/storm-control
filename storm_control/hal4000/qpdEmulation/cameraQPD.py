@@ -1,6 +1,8 @@
 import abc
 import numpy as np
-from typing import Tuple
+from typing import Tuple, Union
+import os
+
 from storm_control.hal4000.halLib.halFunctionality import HalFunctionality
 from storm_control.hal4000.halLib.halModule import HalModule
 import storm_control.sc_hardware.baseClasses.hardwareModule as hardwareModule
@@ -66,6 +68,22 @@ class Camera(hardwareModule.HardwareModule, HalFunctionality): # metaclass=abc.A
 
 
 class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionalityMixin):
+    """
+    Exposes the QPD emulation via camera to the rest of the system. This class
+    takes in the camera hardware interface and fit approch and handles
+    combining the logic.
+
+    :ivar camera: The hardware interface to the camera being used
+    :ivar camera_module: Name of the camera module as defined in the XML config
+    :ivar fit_approach: The fit method that operates on camera frames
+    :ivar fit_module: Name of the fit module as defined in the XML config
+    :ivar aoi_width: The width of the area of interest of the camera frame
+    :ivar aoi_height: The height of the area of interest of the camera frame
+    :ivar offset_file_location: Location of AOI start coordinate file. File
+        should contain the x,y coordinate as in the example "756,800"
+    :ivar aoi_x_start: The starting x coordinate of the AOI
+    :ivar aoi_y_start: The starting y coordinate of the AOI
+    """
     CAMERA_MODULE_ERROR = 'Configuration has not completed successfully, camera for QPD emulation not found'
 
     def __init__(self, module_params = None, qt_settings = None, **kwds):
@@ -76,16 +94,33 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         configuration = module_params.get("configuration")
 
         # Grab the camera module
-        self.camera = None
-        self.camera_module = configuration.get('camera', None)
+        self.camera: Union[Camera, None] = None
+        self.camera_module: str = configuration.get('camera', None)
         if self.camera_module is None:
             raise Exception('Camera object not provided to CameraQPD')
 
         # Grab the fit module
-        self.fit_approach = None
-        self.fit_module = configuration.get('fit', None)
+        self.fit_approach: Union[None, CameraQPDFit]  = None
+        self.fit_module: str = configuration.get('fit', None)
         if self.fit_module is None:
             raise Exception('Fit module not provided to CameraQPD')
+
+        # Get the width and height of the AOI
+        self.aoi_width: int = configuration.get('aoi_width', None)
+        self.aoi_height: int = configuration.get('aoi_heigth', None)
+        if self.aoi_width is None or self.aoi_height is None:
+            raise Exception('AOI width and height required')
+
+        # Get the AOI starting x and y positions
+        self.offset_file_location: str = configuration.get('offset_file', None)
+        if self.offset_file_location is None:
+            raise Exception('Provide an offset file to the CameraQPD to handle AOI')
+        if not os.path.isfile(self.offset_file_location):
+            raise Exception('Provided offset file location is not accessible: {}'.format(self.offset_file_location))
+        self.aoi_x_start = 0
+        self.aoi_y_start = 0
+        with open(self.offset_file_location, 'r') as offset_file:
+            self.aoi_x_start, self.aoi_y_start = offset_file.readline().split(',')[:2]
 
     def handleResponse(self, message, response) -> None:
         if message.isType('get functionality') and response.source == self.camera_module:
