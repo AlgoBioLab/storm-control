@@ -2,6 +2,8 @@ import abc
 import numpy as np
 from typing import Tuple, Union
 import os
+from PyQt5 import QtCore
+import time
 
 from storm_control.hal4000.halLib.halFunctionality import HalFunctionality
 from storm_control.hal4000.halLib.halModule import HalModule
@@ -30,12 +32,12 @@ class Camera(hardwareModule.HardwareModule, HalFunctionality): # metaclass=abc.A
 
         If a new frame is not captured by "timeout", and expection is thrown.
         """
-        pass
+        return np.ndarray([])
 
     #@abc.abstractmethod
     def getTimeout(self) -> float:
         """ Get the current timeout set for the camera. Timeout is in seconds """
-        pass
+        return 0.0
 
     #@abc.abstractmethod
     def setTimeout(self, timeout: float) -> None:
@@ -66,6 +68,40 @@ class Camera(hardwareModule.HardwareModule, HalFunctionality): # metaclass=abc.A
             message.addResponse(halMessage.HalMessageResponse(source=self.module_name, data={'functionality': self}))
 
 
+class CameraQPDScanThread(QtCore.QThread):
+    """
+    Handles periodic polling of the camera to determine the current offset.
+    In testing this approach appeared more performant than starting a new
+    QRunnable for each scan.
+    """
+    def __init__(self, camera, qpd_update_signal, reps, units_to_microns):
+        self.camera = camera
+        self.qpd_update_signal = qpd_update_signal
+        self.reps = reps
+        self.units_to_microns = units_to_microns
+        self.running = False
+
+    def isRunning(self) -> bool:
+        return self.running
+
+    def run(self) -> None:
+        self.running = True
+        while (self.running):
+            # Capture a scan
+            [power, offset, is_good] = self.camera.qpdScan(reps = self.reps)
+
+            # Get the intermediate results from the scane
+
+            # Emit the results
+            pass
+
+    def startScan(self) -> None:
+        self.start(QtCore.QThread.NormalPriority)
+
+    def stopScan(self) -> None:
+        self.running = False
+        self.wait()
+
 
 class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionalityMixin):
     """
@@ -83,8 +119,12 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         should contain the x,y coordinate as in the example "756,800"
     :ivar aoi_x_start: The starting x coordinate of the AOI
     :ivar aoi_y_start: The starting y coordinate of the AOI
+    :ivar qpdUpdate: Signal used to share new QPD data outside of this class
+    :ivar thread_update: Signal used to get QPD data from the QPD thread
     """
     CAMERA_MODULE_ERROR = 'Configuration has not completed successfully, camera for QPD emulation not found'
+    FIT_MODULE_ERROR = 'Configuration has not completed successfully, fit approach for QPD emulation not found'
+
 
     def __init__(self, module_params = None, qt_settings = None, **kwds):
         super().__init__(**kwds)
@@ -122,11 +162,20 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         with open(self.offset_file_location, 'r') as offset_file:
             self.aoi_x_start, self.aoi_y_start = offset_file.readline().split(',')[:2]
 
+        # Setup signals for QPD update emissions
+        self.qpdUpdate = QtCore.pyqtSignal(dict)
+        self.thread_update = QtCore.pyqtSignal(dict)
+        self.thread_update.connect(self.handleThreadUpdate)
+
     def handleResponse(self, message, response) -> None:
         if message.isType('get functionality') and response.source == self.camera_module:
             self.camera = response.getData()['functionality']
         elif message.isType('get functionality') and response.source == self.fit_module:
             self.fit_approach = response.getData()['functionality']
+
+        # If the camera and fit approach are now defined, create thread
+        if self.camera and self.fit_approach:
+            self.startQPDThread()
 
     def processMessage(self, message) -> None:
         if message.isType('configuration'):
@@ -137,23 +186,62 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
             self.sendMessage(halMessage.HalMessage(m_type='get functionality',
                                                    data={ 'name': self.fit_module }))
 
+    def startQPDThread(self) -> None:
+        # Create the thread
+        # TODO: Get the value for reps, and units_to_microns
+        self.scan_thread = CameraQPDScanThread(self.camera, self.thread_update, 10, 10)
+
+    def qpdScan(self, reps=4) -> Tuple[float, float, bool]:
+        assert self.camera is not None, CameraQPD.CAMERA_MODULE_ERROR
+        assert self.fit_approach is not None, CameraQPD.FIT_MODULE_ERROR
+
+        power_total = 0.0
+        offset_total = 0.0
+        good_total = 0.0
+        for _ in range(reps):
+            [power, n_good, offset] = self.fit_approach.singleQpdScan(self.camera.getImage())
+            power_total += power
+            good_total += n_good
+            offset_total += offset
+
+        power_total = power_total/float(reps)
+        if (good_total > 0):
+            return tuple([power_total, offset_total/good_total, True])
+        else:
+            return tuple([power_total, 0, False])
+
+    def handleThreadUpdate(self, qpd_dict: dict) -> None:
+        #
+        # Why are we doing this? In testing we found that bouncing the update signal
+        # from the scan_thread through this class meant we could sample about twice
+        # as fast as having scan_thread directly emit the qpdUpdate() signal. It is
+        # not that clear why this should be the case. Perhaps signals are not buffered
+        # so scan_thread was having to wait for the focus lock control / GUI to
+        # process the signal before it could start on the next sample?
+        #
+        self.qpdUpdate.emit(qpd_dict)
 
     # QPDCameraFunctionalityMixin
     def adjustAOI(self, dx, dy):
         assert self.camera is not None, CameraQPD.CAMERA_MODULE_ERROR
         pass
 
-    def adjustZeroDist(self, inc):
+    def adjustZeroDist(self, inc) -> None:
         pass
 
-    def changeFitMode(self, mode):
+    def changeFitMode(self, mode) -> None:
         pass
 
-    def getMinimumInc(self):
-        pass
+    def getMinimumInc(self) -> int:
+        return 0
 
     def getOffset(self):
-        pass
+        #
+        # lockControl.LockControl will call this each time the qpdUpdate signal
+        # is emitted, but we only want the thread to get started once.
+        #
+        if not self.scan_thread.isRunning():
+            self.scan_thread.startScan()
 
     def getFunctionality(self, message):
         if (message.getData()["name"] == self.module_name):
@@ -170,6 +258,56 @@ class CameraQPDFit(HalModule, HalFunctionality):
     @abc.abstractmethod
     def doFit(self, data: np.ndarray) -> Tuple:
         pass
+
+    def singleQpdScan(self, image: np.ndarray):
+        """
+        Perform a single measurement of the focus lock offset and camera sum signal.
+
+        Returns [power, total_good, offset]
+        """
+        assert self.camera is not None, CameraQPD.CAMERA_MODULE_ERROR
+
+        # The power number is the sum over the camera AOI minus the background.
+        power = np.sum(image.astype(np.int64)) - self.background
+
+        # (Simple) Check for duplicate frames.
+        if (power == self.last_power):
+            #print("> UC480-QPD: Duplicate image detected!")
+            time.sleep(0.05)
+            return [self.last_power, 0, 0]
+
+        self.last_power = power
+
+        # Determine offset by fitting gaussians to the two beam spots.
+        # In the event that only beam spot can be fit then this will
+        # attempt to compensate. However this assumes that the two
+        # spots are centered across the mid-line of camera ROI.
+        #
+        if (self.fit_mode == 1):
+            [total_good, dist1, dist2] = self.doFit(image)
+
+        # Determine offset by moments calculation.
+        else:
+            [total_good, dist1, dist2] = self.doMoments(image)
+
+        # Calculate offset.
+        #
+
+        # No good fits.
+        if (total_good == 0):
+            return [power, 0.0, 0.0]
+
+        # One good fit.
+        elif (total_good == 1):
+            if self.allow_single_fits:
+                return [power, 1.0, ((dist1 + dist2) - 0.5*self.zero_dist)]
+            else:
+                return [power, 0.0, 0.0]
+
+        # Two good fits. This gets twice the weight of one good fit
+        # if we are averaging.
+        else:
+            return [power, 2.0, 2.0*((dist1 + dist2) - self.zero_dist)]
 
     def processMessage(self, message):
         if message.isType('get functionality') and message.getData()['name'] == self.module_name:
