@@ -1,11 +1,13 @@
 import time
 import abc
-from typing import Tuple
 import numpy as np
 from dataclasses import dataclass
 
 from storm_control.hal4000.halLib.halModule import HalModule
 from storm_control.hal4000.halLib.halFunctionality import HalFunctionality
+import storm_control.hal4000.halLib.halMessage as halMessage
+import storm_control.sc_hardware.utility.np_lock_peak_finder as npLPF
+
 
 @dataclass
 class CameraQPDFitResults:
@@ -161,28 +163,41 @@ class CameraQPDScipyFit(CameraQPDFit):
     found in
     `storm_control/sc_hardware/thorlabs/uc480Camera.py`
     """
+    @dataclass
+    class GaussianResult:
+        max_x: float
+        max_y: float
+        params: object
+        status: bool
+
     def __init__(self, fit_mutex = None, **kwds):
         super().__init__(**kwds)
 
         self.fit_mutex = fit_mutex
 
-    def doFit(self, data) -> Tuple:
+        # TODO: Get values from configruation
+        self.half_x = 0
+        self.half_y = 0
+        self.fit_size = 0
+
+    def doFit(self, data) -> FitIntemediateResults:
         dist1 = 0
         dist2 = 0
-        self.x_off1 = 0.0
-        self.y_off1 = 0.0
-        self.x_off2 = 0.0
-        self.y_off2 = 0.0
+
+        x_off1 = 0.0
+        y_off1 = 0.0
+        x_off2 = 0.0
+        y_off2 = 0.0
 
         # numpy finder/fitter.
         #
         # Fit first gaussian to data in the left half of the picture.
-        total_good =0
-        [max_x, max_y, params, status] = self.fitGaussian(data[:,:self.half_x])
-        if status:
+        total_good = 0
+        gaussian_result = self.fitGaussian(data[:,:self.half_x])
+        if gaussian_result.status:
             total_good += 1
-            self.x_off1 = float(max_x) + params[2] - self.half_y
-            self.y_off1 = float(max_y) + params[3] - self.half_x
+            self.x_off1 = float(gaussian_result.max_x) + gaussian_result.params[2] - self.half_y
+            self.y_off1 = float(gaussian_result.max_y) + gaussian_result.params[3] - self.half_x
             dist1 = abs(self.y_off1)
 
         # Fit second gaussian to data in the right half of the picture.
@@ -193,11 +208,11 @@ class CameraQPDScipyFit(CameraQPDFit):
             self.y_off2 = float(max_y) + params[3]
             dist2 = abs(self.y_off2)
 
-        return (total_good, dist1, dist2)
+        return FitIntemediateResults(total_good, dist1, dist2, x_off1, y_off1, x_off2, y_off2)
 
-    def fitGaussian(self, data):
+    def fitGaussian(self, data) -> CameraQPDScipyFit.GaussianResult:
         if (np.max(data) < 25):
-            return [False, False, False, False]
+            return CameraQPDScipyFit.GaussianResult(0.0, 0.0, None, False)
         x_width = data.shape[0]
         y_width = data.shape[1]
         max_i = data.argmax()
@@ -211,6 +226,6 @@ class CameraQPDScipyFit(CameraQPDFit):
                 self.fit_mutex.unlock()
             params[2] -= self.fit_size
             params[3] -= self.fit_size
-            return [max_x, max_y, params, status]
+            return CameraQPDScipyFit.GaussianResult(max_x, max_y, params, status)
         else:
-            return [False, False, False, False]
+            return CameraQPDScipyFit.GaussianResult(0.0, 0.0, None, False)

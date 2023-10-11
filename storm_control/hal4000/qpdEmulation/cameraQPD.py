@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Union
 import os
 from PyQt5 import QtCore
 
@@ -6,7 +6,7 @@ import storm_control.sc_hardware.baseClasses.hardwareModule as hardwareModule
 import storm_control.sc_hardware.baseClasses.lockModule as lockModule
 import storm_control.hal4000.halLib.halMessage as halMessage
 from storm_control.hal4000.qpdEmulation.cameraInterface import Camera
-from storm_control.hal4000.qpdEmulation.cameraQPDFit import CameraQPDFit
+from storm_control.hal4000.qpdEmulation.cameraQPDFit import CameraQPDFit, CameraQPDFitResults
 
 
 class CameraQPDScanThread(QtCore.QThread):
@@ -15,8 +15,9 @@ class CameraQPDScanThread(QtCore.QThread):
     In testing this approach appeared more performant than starting a new
     QRunnable for each scan.
     """
-    def __init__(self, camera, qpd_update_signal, reps, units_to_microns):
+    def __init__(self, camera: Camera, fit: CameraQPDFit, qpd_update_signal, reps, units_to_microns):
         self.camera = camera
+        self.fit = fit
         self.qpd_update_signal = qpd_update_signal
         self.reps = reps
         self.units_to_microns = units_to_microns
@@ -28,16 +29,87 @@ class CameraQPDScanThread(QtCore.QThread):
     def run(self) -> None:
         self.running = True
         while (self.running):
-            # Capture a scan
-            [power, offset, is_good] = self.camera.qpdScan(reps = self.reps)
-
-            # Get the intermediate results from the scane
+            # Capture the results
+            fit_result = self.qpdScan(reps = self.reps)
 
             # Emit the results
-            pass
+            result_dict = {
+                'is_good': fit_result.total_good > 0,
+                'image': fit_result.image,
+                'offset': fit_result.offset * self.units_to_microns,
+                'sigma': fit_result.sigma,
+                'sum': fit_result.power,
+                'x_off1': fit_result.x_off1,
+                'y_off1': fit_result.y_off1,
+                'x_off2': fit_result.x_off2,
+                'y_off2': fit_result.y_off2
+            }
+            self.qpd_update_signal.emit(result_dict)
+
+
+    def qpdScan(self, reps=4) -> CameraQPDFitResults:
+        """
+        Handles executing a series of scans with the average power is
+        computed over. This is a legacy component from the previous QPD
+        implemented from the UC480 code. The average calcualation would
+        ideally be separated from the thread, but the for loop requires
+        repeated calls to `singleQPDScan`. In order to decouple the fit logic
+        and camera logic, this approach was maintained so that an image
+        can be passed directly to the fit logic.
+        """
+        assert reps > 0, 'Number of reps must be greater then 0'
+
+        power_total = 0.0
+        offset_total = 0.0
+        good_total = 0.0
+        most_recent_result = None
+
+        for _ in range(reps):
+            # Make the single fit request
+            fit_result = self.fit.singleQpdScan(self.camera.getImage())
+
+            # Calcualte the aggregate results
+            power_total += fit_result.power
+            good_total += fit_result.total_good
+            offset_total += fit_result.offset
+
+            # Update the most recent result
+            most_recent_result = fit_result
+
+        assert most_recent_result is not None, 'Error QPD scans unexpectedly did not produce any results'
+
+        power_total = power_total/float(reps)
+        if good_total > 0:
+            return CameraQPDFitResults(
+                power_total,
+                good_total,
+                offset_total,
+                most_recent_result.dist1,
+                most_recent_result.dist2,
+                most_recent_result.image.copy(),
+                most_recent_result.x_off1,
+                most_recent_result.y_off1,
+                most_recent_result.x_off2,
+                most_recent_result.y_off2,
+                most_recent_result.sigma
+            )
+        else:
+            return CameraQPDFitResults(
+                power_total,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                most_recent_result.image.copy(),
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                most_recent_result.sigma
+            )
 
     def startScan(self) -> None:
-        self.start(QtCore.QThread.NormalPriority)
+        self.start(QtCore.QThread.Priority.NormalPriority)
 
     def stopScan(self) -> None:
         self.running = False
@@ -130,26 +202,12 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
     def startQPDThread(self) -> None:
         # Create the thread
         # TODO: Get the value for reps, and units_to_microns
-        self.scan_thread = CameraQPDScanThread(self.camera, self.thread_update, 10, 10)
+        assert self.camera is not None, 'Camera not defined'
+        assert self.fit_approach is not None, 'Fit approach is not defined'
 
-    def qpdScan(self, reps=4) -> Tuple[float, float, bool]:
-        assert self.camera is not None, CameraQPD.CAMERA_MODULE_ERROR
-        assert self.fit_approach is not None, CameraQPD.FIT_MODULE_ERROR
+        self.scan_thread = CameraQPDScanThread(self.camera, self.fit_approach, self.thread_update, 10, 10)
 
-        power_total = 0.0
-        offset_total = 0.0
-        good_total = 0.0
-        for _ in range(reps):
-            [power, n_good, offset] = self.fit_approach.singleQpdScan(self.camera.getImage())
-            power_total += power
-            good_total += n_good
-            offset_total += offset
 
-        power_total = power_total/float(reps)
-        if (good_total > 0):
-            return tuple([power_total, offset_total/good_total, True])
-        else:
-            return tuple([power_total, 0, False])
 
     def handleThreadUpdate(self, qpd_dict: dict) -> None:
         #
