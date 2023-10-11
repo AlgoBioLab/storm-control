@@ -1,4 +1,3 @@
-import time
 import abc
 import numpy as np
 from dataclasses import dataclass
@@ -177,9 +176,6 @@ class CameraQPDScipyFit(CameraQPDFit):
 
         self.fit_mutex = fit_mutex
 
-        # TODO: Get values from configruation
-        self.half_x = 100
-        self.half_y = 100
         self.fit_size = int(1.5 * self.sigma)
 
     def doFit(self, data) -> FitIntemediateResults:
@@ -191,21 +187,25 @@ class CameraQPDScipyFit(CameraQPDFit):
         x_off2 = 0.0
         y_off2 = 0.0
 
+        x_width, y_width = data.shape
+        half_x = int(x_width / 2)
+        half_y = int(y_width / 2)
+
         # numpy finder/fitter.
         #
         # Fit first gaussian to data in the left half of the picture.
         total_good = 0
-        gaussian_result = self.fitGaussian(data[:,:self.half_x])
+        gaussian_result = self.fitGaussian(data[:,:half_x])
         if gaussian_result.status:
             total_good += 1
-            x_off1 = float(gaussian_result.max_x) + gaussian_result.params[2] - self.half_y
-            y_off1 = float(gaussian_result.max_y) + gaussian_result.params[3] - self.half_x
+            x_off1 = float(gaussian_result.max_x) + gaussian_result.params[2] - half_y
+            y_off1 = float(gaussian_result.max_y) + gaussian_result.params[3] - half_x
             dist1 = abs(y_off1)
 
         # Fit second gaussian to data in the right half of the picture.
         if gaussian_result.status:
             total_good += 1
-            x_off2 = float(gaussian_result.max_x) + gaussian_result.params[2] - self.half_y
+            x_off2 = float(gaussian_result.max_x) + gaussian_result.params[2] - half_y
             y_off2 = float(gaussian_result.max_y) + gaussian_result.params[3]
             dist2 = abs(y_off2)
 
