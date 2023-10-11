@@ -180,6 +180,9 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         with open(self.offset_file_location, 'r') as offset_file:
             self.aoi_x_start, self.aoi_y_start = offset_file.readline().split(',')[:2]
 
+        self.units_to_microns = configuration.get('units_to_microns')
+        self.reps = configuration.get('reps')
+
         # Setup signals for QPD update emissions
         self.thread_update.connect(self.handleThreadUpdate)
 
@@ -208,13 +211,10 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
 
     def startQPDThread(self) -> None:
         # Create the thread
-        # TODO: Get the value for reps, and units_to_microns
         assert self.camera is not None, 'Camera not defined'
         assert self.fit_approach is not None, 'Fit approach is not defined'
 
-        self.scan_thread = CameraQPDScanThread(self.camera, self.fit_approach, self.thread_update, 10, 10)
-
-
+        self.scan_thread = CameraQPDScanThread(self.camera, self.fit_approach, self.thread_update, self.reps, self.units_to_microns)
 
     def handleThreadUpdate(self, qpd_dict: dict) -> None:
         #

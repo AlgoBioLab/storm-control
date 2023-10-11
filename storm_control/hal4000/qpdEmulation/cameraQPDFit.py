@@ -42,7 +42,6 @@ class CameraQPDFit(HalModule, HalFunctionality):
 
         configuration = module_params.get('configuration')
 
-        # TODO: Grab the following values from config
         self.sigma = configuration.get('sigma')
         self.background = configuration.get('background')
         self.zero_dist = configuration.get('zero_dist')
