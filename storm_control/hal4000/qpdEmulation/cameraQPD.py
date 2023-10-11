@@ -138,6 +138,9 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
     CAMERA_MODULE_ERROR = 'Configuration has not completed successfully, camera for QPD emulation not found'
     FIT_MODULE_ERROR = 'Configuration has not completed successfully, fit approach for QPD emulation not found'
 
+    qpdUpdate = QtCore.pyqtSignal(dict)
+    thread_update = QtCore.pyqtSignal(dict)
+
 
     def __init__(self, module_params = None, qt_settings = None, **kwds):
         super().__init__(**kwds)
@@ -160,7 +163,7 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
 
         # Get the width and height of the AOI
         self.aoi_width: int = configuration.get('aoi_width', None)
-        self.aoi_height: int = configuration.get('aoi_heigth', None)
+        self.aoi_height: int = configuration.get('aoi_height', None)
         if self.aoi_width is None or self.aoi_height is None:
             raise Exception('AOI width and height required')
 
@@ -176,8 +179,6 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
             self.aoi_x_start, self.aoi_y_start = offset_file.readline().split(',')[:2]
 
         # Setup signals for QPD update emissions
-        self.qpdUpdate = QtCore.pyqtSignal(dict)
-        self.thread_update = QtCore.pyqtSignal(dict)
         self.thread_update.connect(self.handleThreadUpdate)
 
     def handleResponse(self, message, response) -> None:

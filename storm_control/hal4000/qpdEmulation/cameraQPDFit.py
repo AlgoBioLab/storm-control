@@ -210,7 +210,7 @@ class CameraQPDScipyFit(CameraQPDFit):
 
         return FitIntemediateResults(total_good, dist1, dist2, x_off1, y_off1, x_off2, y_off2)
 
-    def fitGaussian(self, data) -> CameraQPDScipyFit.GaussianResult:
+    def fitGaussian(self, data) -> GaussianResult:
         if (np.max(data) < 25):
             return CameraQPDScipyFit.GaussianResult(0.0, 0.0, None, False)
         x_width = data.shape[0]
