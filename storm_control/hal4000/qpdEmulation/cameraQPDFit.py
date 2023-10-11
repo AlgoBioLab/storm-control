@@ -41,11 +41,13 @@ class CameraQPDFit(HalModule, HalFunctionality):
         super().__init__(**kwds)
         self.last_power = 0.0
 
+        configuration = module_params.get('configuration')
+
         # TODO: Grab the following values from config
-        self.sigma = 0.0
-        self.background = 0
-        self.zero_dist = 0.0
-        self.allow_single_fits = True
+        self.sigma = configuration.get('sigma')
+        self.background = configuration.get('background')
+        self.zero_dist = configuration.get('zero_dist')
+        self.allow_single_fits = configuration.get('allow_single_fits')
 
     @abc.abstractmethod
     def doFit(self, data: np.ndarray) -> FitIntemediateResults:
@@ -178,7 +180,6 @@ class CameraQPDScipyFit(CameraQPDFit):
         # TODO: Get values from configruation
         self.half_x = 100
         self.half_y = 100
-        self.sigma = 3.0
         self.fit_size = int(1.5 * self.sigma)
 
     def doFit(self, data) -> FitIntemediateResults:

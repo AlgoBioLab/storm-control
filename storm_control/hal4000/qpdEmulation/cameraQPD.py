@@ -148,7 +148,7 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         # Module parameters provided when constructing the module
         assert module_params is not None
 
-        configuration = module_params.get("configuration")
+        configuration = module_params.get('configuration')
         self.parameters = configuration.get('parameters')
 
         # Grab the camera module
