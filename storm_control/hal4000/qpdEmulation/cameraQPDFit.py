@@ -54,15 +54,14 @@ class CameraQPDFit(HalModule, HalFunctionality):
     def singleQpdScan(self, image: np.ndarray) -> CameraQPDFitResults:
         """
         Perform a single measurement of the focus lock offset and camera sum signal.
-
-        Returns [power, total_good, offset]
         """
         # The power number is the sum over the camera AOI minus the background.
         power = float(np.sum(image.astype(np.int64)) - self.background)
 
         # (Simple) Check for duplicate frames.
+        '''
         if (power == self.last_power):
-            #print("> UC480-QPD: Duplicate image detected!")
+            print("> UC480-QPD: Duplicate image detected!")
             time.sleep(0.05)
             return CameraQPDFitResults(
                 self.last_power,
@@ -77,6 +76,7 @@ class CameraQPDFit(HalModule, HalFunctionality):
                 0.0,
                 self.sigma
             )
+        '''
 
         self.last_power = power
 
@@ -178,7 +178,7 @@ class CameraQPDScipyFit(CameraQPDFit):
         # TODO: Get values from configruation
         self.half_x = 100
         self.half_y = 100
-        self.sigma = 5
+        self.sigma = 3.0
         self.fit_size = int(1.5 * self.sigma)
 
     def doFit(self, data) -> FitIntemediateResults:
@@ -195,6 +195,7 @@ class CameraQPDScipyFit(CameraQPDFit):
         # Fit first gaussian to data in the left half of the picture.
         total_good = 0
         gaussian_result = self.fitGaussian(data[:,:self.half_x])
+        print(gaussian_result)
         if gaussian_result.status:
             total_good += 1
             self.x_off1 = float(gaussian_result.max_x) + gaussian_result.params[2] - self.half_y

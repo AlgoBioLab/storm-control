@@ -45,6 +45,7 @@ class CameraQPDScanThread(QtCore.QThread):
                 'x_off2': fit_result.x_off2,
                 'y_off2': fit_result.y_off2
             }
+            print(result_dict)
             self.qpd_update_signal.emit(result_dict)
 
 
