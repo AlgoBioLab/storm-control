@@ -195,20 +195,18 @@ class CameraQPDScipyFit(CameraQPDFit):
         # Fit first gaussian to data in the left half of the picture.
         total_good = 0
         gaussian_result = self.fitGaussian(data[:,:self.half_x])
-        print(gaussian_result)
         if gaussian_result.status:
             total_good += 1
-            self.x_off1 = float(gaussian_result.max_x) + gaussian_result.params[2] - self.half_y
-            self.y_off1 = float(gaussian_result.max_y) + gaussian_result.params[3] - self.half_x
-            dist1 = abs(self.y_off1)
+            x_off1 = float(gaussian_result.max_x) + gaussian_result.params[2] - self.half_y
+            y_off1 = float(gaussian_result.max_y) + gaussian_result.params[3] - self.half_x
+            dist1 = abs(y_off1)
 
         # Fit second gaussian to data in the right half of the picture.
-        gaussian_result = self.fitGaussian(data[:,-self.half_x:])
         if gaussian_result.status:
             total_good += 1
-            self.x_off2 = float(gaussian_result.max_x) + gaussian_result.params[2] - self.half_y
-            self.y_off2 = float(gaussian_result.max_y) + gaussian_result.params[3]
-            dist2 = abs(self.y_off2)
+            x_off2 = float(gaussian_result.max_x) + gaussian_result.params[2] - self.half_y
+            y_off2 = float(gaussian_result.max_y) + gaussian_result.params[3]
+            dist2 = abs(y_off2)
 
         return FitIntemediateResults(total_good, dist1, dist2, x_off1, y_off1, x_off2, y_off2)
 
