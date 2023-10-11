@@ -16,6 +16,7 @@ class CameraQPDScanThread(QtCore.QThread):
     QRunnable for each scan.
     """
     def __init__(self, camera: Camera, fit: CameraQPDFit, qpd_update_signal, reps, units_to_microns):
+        super().__init__()
         self.camera = camera
         self.fit = fit
         self.qpd_update_signal = qpd_update_signal
@@ -116,7 +117,7 @@ class CameraQPDScanThread(QtCore.QThread):
         self.wait()
 
 
-class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionalityMixin):
+class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionalityMixin, hardwareModule.HardwareFunctionality):
     """
     Exposes the QPD emulation via camera to the rest of the system. This class
     takes in the camera hardware interface and fit approch and handles
@@ -148,6 +149,7 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         assert module_params is not None
 
         configuration = module_params.get("configuration")
+        self.parameters = configuration.get('parameters')
 
         # Grab the camera module
         self.camera: Union[Camera, None] = None
@@ -181,6 +183,8 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         # Setup signals for QPD update emissions
         self.thread_update.connect(self.handleThreadUpdate)
 
+        self.device_mutex = QtCore.QMutex()
+
     def handleResponse(self, message, response) -> None:
         if message.isType('get functionality') and response.source == self.camera_module:
             self.camera = response.getData()['functionality']
@@ -199,6 +203,8 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
             # Request the fit object
             self.sendMessage(halMessage.HalMessage(m_type='get functionality',
                                                    data={ 'name': self.fit_module }))
+        if message.isType('get functionality'):
+            self.getFunctionality(message)
 
     def startQPDThread(self) -> None:
         # Create the thread
@@ -245,9 +251,5 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
 
     def getFunctionality(self, message):
         if (message.getData()["name"] == self.module_name):
-            print(message.source)
             message.addResponse(halMessage.HalMessageResponse(source = self.module_name,
                                                               data = {"functionality" : self}))
-
-
-
