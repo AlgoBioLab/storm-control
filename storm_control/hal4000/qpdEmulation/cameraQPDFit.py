@@ -1,6 +1,5 @@
 import abc
 import numpy as np
-from dataclasses import dataclass
 
 from storm_control.hal4000.halLib.halModule import HalModule
 from storm_control.hal4000.halLib.halFunctionality import HalFunctionality
@@ -8,30 +7,33 @@ import storm_control.hal4000.halLib.halMessage as halMessage
 import storm_control.sc_hardware.utility.np_lock_peak_finder as npLPF
 
 
-@dataclass
 class CameraQPDFitResults:
-    power: float
-    total_good: float
-    offset: float
-    dist1: float
-    dist2: float
-    image: np.ndarray
-    x_off1: float
-    y_off1: float
-    x_off2: float
-    y_off2: float
-    sigma: float
+    def __init__(self, power: float, total_good: float, offset: float,
+                 dist1: float, dist2: float, image: np.ndarray, x_off1: float,
+                 y_off1: float, x_off2: float, y_off2: float, sigma: float):
+        self.power = power
+        self.total_good = total_good
+        self.offset = offset
+        self.dist1 = dist1
+        self.dist2 = dist2
+        self.image = image
+        self.x_off1 = x_off1
+        self.y_off1 = y_off1
+        self.x_off2 = x_off2
+        self.y_off2 = y_off2
+        self.sigma = sigma
 
 
-@dataclass
 class FitIntemediateResults:
-    total_good: int
-    dist1: float
-    dist2: float
-    x_off1: float
-    y_off1: float
-    x_off2: float
-    y_off2: float
+    def __init__(self, total_good: int, dist1: float, dist2: float,
+                 x_off1: float, y_off1: float, x_off2: float, y_off2: float):
+        self.total_good = total_good
+        self.dist1 = dist1
+        self.dist2 = dist2
+        self.x_off1 = x_off1
+        self.y_off1 = y_off1
+        self.x_off2 = x_off2
+        self.y_off2 = y_off2
 
 
 class CameraQPDFit(HalModule, HalFunctionality):
@@ -163,12 +165,12 @@ class CameraQPDScipyFit(CameraQPDFit):
     found in
     `storm_control/sc_hardware/thorlabs/uc480Camera.py`
     """
-    @dataclass
     class GaussianResult:
-        max_x: float
-        max_y: float
-        params: object
-        status: bool
+        def __init__(self, max_x: float, max_y: float, params: object, status: bool):
+            self.max_x = max_x
+            self.max_y = max_y
+            self.params = params
+            self.status = status
 
     def __init__(self, fit_mutex = None, **kwds):
         super().__init__(**kwds)
