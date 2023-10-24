@@ -6,7 +6,7 @@ import storm_control.sc_hardware.baseClasses.hardwareModule as hardwareModule
 import storm_control.sc_hardware.baseClasses.lockModule as lockModule
 import storm_control.hal4000.halLib.halMessage as halMessage
 from storm_control.hal4000.qpdEmulation.cameraInterface import Camera
-from storm_control.hal4000.qpdEmulation.cameraQPDFit import CameraQPDFit, CameraQPDFitResults
+from storm_control.hal4000.qpdEmulation.cameraQPDFit import CameraQPDFitResults
 
 
 class CameraQPDScanThread(QtCore.QThread):
@@ -44,7 +44,7 @@ class CameraQPDScanThread(QtCore.QThread):
         self.running = True
         while (self.running):
             # Capture the results
-            fit_result = self.qpdScan(reps = self.reps)
+            fit_result = self.qpdScan(reps=self.reps)
 
             # Emit the results
             result_dict = {
@@ -59,7 +59,6 @@ class CameraQPDScanThread(QtCore.QThread):
                 'y_off2': fit_result.y_off2
             }
             self.qpd_update_signal.emit(result_dict)
-
 
     def qpdScan(self, reps=4):
         """
@@ -92,7 +91,8 @@ class CameraQPDScanThread(QtCore.QThread):
             # Update the most recent result
             most_recent_result = fit_result
 
-        assert most_recent_result is not None, 'Error QPD scans unexpectedly did not produce any results'
+        assert most_recent_result is not None, \
+            'Error QPD scans unexpectedly did not produce any results'
 
         power_total = power_total/float(reps)
         if good_total > 0:
@@ -132,7 +132,9 @@ class CameraQPDScanThread(QtCore.QThread):
         self.wait()
 
 
-class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionalityMixin, hardwareModule.HardwareFunctionality):
+class CameraQPD(hardwareModule.HardwareModule,
+                lockModule.QPDCameraFunctionalityMixin,
+                hardwareModule.HardwareFunctionality):
     """
     Exposes the QPD emulation via camera to the rest of the system. This class
     takes in the camera hardware interface and fit approch and handles
@@ -151,14 +153,15 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
     :ivar qpdUpdate: Signal used to share new QPD data outside of this class
     :ivar thread_update: Signal used to get QPD data from the QPD thread
     """
-    CAMERA_MODULE_ERROR = 'Configuration has not completed successfully, camera for QPD emulation not found'
-    FIT_MODULE_ERROR = 'Configuration has not completed successfully, fit approach for QPD emulation not found'
+    CAMERA_MODULE_ERROR = 'Configuration has not completed successfully, \
+            camera for QPD emulation not found'
+    FIT_MODULE_ERROR = 'Configuration has not completed successfully, \
+            fit approach for QPD emulation not found'
 
     qpdUpdate = QtCore.pyqtSignal(dict)
     thread_update = QtCore.pyqtSignal(dict)
 
-
-    def __init__(self, module_params = None, qt_settings = None, **kwds):
+    def __init__(self, module_params=None, qt_settings=None, **kwds):
         super().__init__(**kwds)
         # Module parameters provided when constructing the module
         assert module_params is not None
@@ -173,8 +176,8 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
             raise Exception('Camera object not provided to CameraQPD')
 
         # Grab the fit module
-        self.fit_approach: Union[None, CameraQPDFit]  = None
-        self.fit_module: str = configuration.get('fit', None)
+        self.fit_approach = None
+        self.fit_module = configuration.get('fit', None)
         if self.fit_module is None:
             raise Exception('Fit module not provided to CameraQPD')
 
@@ -187,13 +190,16 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         # Get the AOI starting x and y positions
         self.offset_file_location: str = configuration.get('offset_file', None)
         if self.offset_file_location is None:
-            raise Exception('Provide an offset file to the CameraQPD to handle AOI')
+            raise Exception('Provide an offset file to the CameraQPD to \
+                    handle AOI')
         if not os.path.isfile(self.offset_file_location):
-            raise Exception('Provided offset file location is not accessible: {}'.format(self.offset_file_location))
+            raise Exception('Provided offset file location is not accessible: \
+                    {}'.format(self.offset_file_location))
         self.aoi_x_start = 0
         self.aoi_y_start = 0
         with open(self.offset_file_location, 'r') as offset_file:
-            self.aoi_x_start, self.aoi_y_start = offset_file.readline().split(',')[:2]
+            self.aoi_x_start, self.aoi_y_start = \
+                offset_file.readline().split(',')[:2]
 
         self.units_to_microns = configuration.get('units_to_microns')
         self.reps = configuration.get('reps')
@@ -207,9 +213,10 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         """
         :rtype: None
         """
-        if message.isType('get functionality') and response.source == self.camera_module:
+        is_functionality = message.isType('get functionality')
+        if is_functionality and response.source == self.camera_module:
             self.camera = response.getData()['functionality']
-        elif message.isType('get functionality') and response.source == self.fit_module:
+        elif is_functionality and response.source == self.fit_module:
             self.fit_approach = response.getData()['functionality']
 
         # If the camera and fit approach are now defined, create thread
@@ -222,14 +229,19 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         """
         if message.isType('configuration'):
             # Request the camera object
+            data = {'name': self.camera_module}
             self.sendMessage(halMessage.HalMessage(m_type='get functionality',
-                                                   data={ 'name': self.camera_module }))
+                                                   data=data))
             # Request the fit object
+            data = {'name': self.fit_module}
             self.sendMessage(halMessage.HalMessage(m_type='get functionality',
-                                                   data={ 'name': self.fit_module }))
-        if message.isType('get functionality') and message.getData()['name'] == self.module_name:
-            message.addResponse(halMessage.HalMessageResponse(source = self.module_name,
-                                                              data = {"functionality" : self}))
+                                                   data=data))
+        if message.isType('get functionality') and \
+                message.getData()['name'] == self.module_name:
+            data = {'functionality': self}
+            response = halMessage.HalMessageResponse(source=self.module_name,
+                                                     data=data)
+            message.addResponse(response)
 
     def startQPDThread(self):
         """
@@ -239,7 +251,9 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         assert self.camera is not None, 'Camera not defined'
         assert self.fit_approach is not None, 'Fit approach is not defined'
 
-        self.scan_thread = CameraQPDScanThread(self.camera, self.fit_approach, self.thread_update, self.reps, self.units_to_microns)
+        self.scan_thread = CameraQPDScanThread(self.camera, self.fit_approach,
+                                               self.thread_update, self.reps,
+                                               self.units_to_microns)
 
     def handleThreadUpdate(self, qpd_dict):
         """
@@ -247,12 +261,13 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         :rtype: None
         """
         #
-        # Why are we doing this? In testing we found that bouncing the update signal
-        # from the scan_thread through this class meant we could sample about twice
-        # as fast as having scan_thread directly emit the qpdUpdate() signal. It is
-        # not that clear why this should be the case. Perhaps signals are not buffered
-        # so scan_thread was having to wait for the focus lock control / GUI to
-        # process the signal before it could start on the next sample?
+        # Why are we doing this? In testing we found that bouncing the update
+        # signal from the scan_thread through this class meant we could sample
+        # about twice as fast as having scan_thread directly emit the
+        # qpdUpdate() signal. It is not that clear why this should be the case.
+        # Perhaps signals are not buffered so scan_thread was having to wait
+        # for the focus lock control / GUI to process the signal before it
+        # could start on the next sample?
         #
         self.qpdUpdate.emit(qpd_dict)
 

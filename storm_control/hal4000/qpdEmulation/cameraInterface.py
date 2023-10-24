@@ -6,12 +6,12 @@ import storm_control.sc_hardware.baseClasses.hardwareModule as hardwareModule
 import storm_control.hal4000.halLib.halMessage as halMessage
 
 
-class Camera(hardwareModule.HardwareModule, HalFunctionality): # metaclass=abc.ABCMeta):
+class Camera(hardwareModule.HardwareModule, HalFunctionality):
     """
     The interface which is used for describing the functionality of a camera
     being used for QPD emulation
     """
-    def __init__(self, module_params = None, qt_settings = None, **kwds):
+    def __init__(self, module_params=None, qt_settings=None, **kwds):
         super().__init__(**kwds)
 
     @abc.abstractmethod
@@ -53,7 +53,7 @@ class Camera(hardwareModule.HardwareModule, HalFunctionality): # metaclass=abc.A
     @abc.abstractmethod
     def getAOI(self):
         """
-        Get the area of interest the camera is capturing for (x_start, y_start, width, height)
+        Get the area of interest the camera is capturing for
 
         :return: (x_start, y_start, width, height)
         :rtype: Tuple[int, int, int, int]
@@ -85,9 +85,13 @@ class Camera(hardwareModule.HardwareModule, HalFunctionality): # metaclass=abc.A
         pass
 
     def processMessage(self, message):
-        if message.isType('get functionality') and message.getData()['name'] == self.module_name:
-            message.addResponse(halMessage.HalMessageResponse(source=self.module_name, data={'functionality': self}))
-
+        is_target_functionality = message.isType('get functionality') and \
+                message.getData()['name'] == self.module_name
+        if is_target_functionality:
+            data = {'functionality': self}
+            response = halMessage.HalMessageResponse(source=self.module_name,
+                                                     data=data)
+            message.addResponse(response)
 
 
 class CameraNone(Camera):
@@ -96,7 +100,7 @@ class CameraNone(Camera):
     """
     import cv2
 
-    def __init__(self, module_params = None, qt_settings = None, **kwds):
+    def __init__(self, module_params=None, qt_settings=None, **kwds):
         super().__init__(**kwds)
         assert module_params is not None
 
@@ -112,7 +116,6 @@ class CameraNone(Camera):
         self.circle_shade = configuration.get('circle_shade', 200)
         self.sigma = configuration.get('sigma', 5)
 
-
     def getImage(self):
         """
         Create an image with two gaussian blurs
@@ -121,12 +124,16 @@ class CameraNone(Camera):
         image = np.full(self.dimensions, 0, dtype=np.uint8)
 
         # Make left circle
-        left_center = (int(0.25 * self.dimensions[1]), int(0.5 * self.dimensions[0]))
-        image = CameraNone.cv2.circle(image, left_center, self.circle_radius, (self.circle_shade,), -1)
+        left_center = (int(0.25 * self.dimensions[1]),
+                       int(0.5 * self.dimensions[0]))
+        image = CameraNone.cv2.circle(image, left_center, self.circle_radius,
+                                      (self.circle_shade,), -1)
 
         # Make right circle
-        right_center = (int(0.75 * self.dimensions[1]), int(0.5 * self.dimensions[0]))
-        image = CameraNone.cv2.circle(image, right_center, self.circle_radius, (self.circle_shade,), -1)
+        right_center = (int(0.75 * self.dimensions[1]),
+                        int(0.5 * self.dimensions[0]))
+        image = CameraNone.cv2.circle(image, right_center, self.circle_radius,
+                                      (self.circle_shade,), -1)
 
         # Blur the image
         image = CameraNone.cv2.GaussianBlur(image, (self.sigma, self.sigma), 0)
@@ -139,7 +146,6 @@ class CameraNone(Camera):
     def setTimeout(self, timeout):
         self.timeout = timeout
 
-
     def getAOI(self):
         return self.aoi
 
@@ -149,4 +155,3 @@ class CameraNone(Camera):
 
     def shutdown(self):
         pass
-
