@@ -15,7 +15,14 @@ class CameraQPDScanThread(QtCore.QThread):
     In testing this approach appeared more performant than starting a new
     QRunnable for each scan.
     """
-    def __init__(self, camera: Camera, fit: CameraQPDFit, qpd_update_signal, reps, units_to_microns):
+    def __init__(self, camera, fit, qpd_update_signal, reps, units_to_microns):
+        """
+        :type camera: Camera
+        :type fit: CameraQPDFit
+        :type qpd_update_signal: object
+        :type reps: int
+        :type units_to_microns: float
+        """
         super().__init__()
         self.camera = camera
         self.fit = fit
@@ -24,10 +31,16 @@ class CameraQPDScanThread(QtCore.QThread):
         self.units_to_microns = units_to_microns
         self.running = False
 
-    def isRunning(self) -> bool:
+    def isRunning(self):
+        """
+        :rtype: bool
+        """
         return self.running
 
-    def run(self) -> None:
+    def run(self):
+        """
+        :rtype: None
+        """
         self.running = True
         while (self.running):
             # Capture the results
@@ -48,7 +61,7 @@ class CameraQPDScanThread(QtCore.QThread):
             self.qpd_update_signal.emit(result_dict)
 
 
-    def qpdScan(self, reps=4) -> CameraQPDFitResults:
+    def qpdScan(self, reps=4):
         """
         Handles executing a series of scans with the average power is
         computed over. This is a legacy component from the previous QPD
@@ -57,6 +70,8 @@ class CameraQPDScanThread(QtCore.QThread):
         repeated calls to `singleQPDScan`. In order to decouple the fit logic
         and camera logic, this approach was maintained so that an image
         can be passed directly to the fit logic.
+
+        :rtype: CameraQPDFitResults
         """
         assert reps > 0, 'Number of reps must be greater then 0'
 
@@ -188,7 +203,10 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
 
         self.device_mutex = QtCore.QMutex()
 
-    def handleResponse(self, message, response) -> None:
+    def handleResponse(self, message, response):
+        """
+        :rtype: None
+        """
         if message.isType('get functionality') and response.source == self.camera_module:
             self.camera = response.getData()['functionality']
         elif message.isType('get functionality') and response.source == self.fit_module:
@@ -198,7 +216,10 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         if self.camera and self.fit_approach:
             self.startQPDThread()
 
-    def processMessage(self, message) -> None:
+    def processMessage(self, message):
+        """
+        :rtype: None
+        """
         if message.isType('configuration'):
             # Request the camera object
             self.sendMessage(halMessage.HalMessage(m_type='get functionality',
@@ -210,14 +231,21 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
             message.addResponse(halMessage.HalMessageResponse(source = self.module_name,
                                                               data = {"functionality" : self}))
 
-    def startQPDThread(self) -> None:
+    def startQPDThread(self):
+        """
+        :rtype: None
+        """
         # Create the thread
         assert self.camera is not None, 'Camera not defined'
         assert self.fit_approach is not None, 'Fit approach is not defined'
 
         self.scan_thread = CameraQPDScanThread(self.camera, self.fit_approach, self.thread_update, self.reps, self.units_to_microns)
 
-    def handleThreadUpdate(self, qpd_dict: dict) -> None:
+    def handleThreadUpdate(self, qpd_dict):
+        """
+        :type qpd_dict: dict
+        :rtype: None
+        """
         #
         # Why are we doing this? In testing we found that bouncing the update signal
         # from the scan_thread through this class meant we could sample about twice
@@ -230,16 +258,32 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
 
     # QPDCameraFunctionalityMixin
     def adjustAOI(self, dx, dy):
+        """
+        :type dx: int
+        :type dy: int
+        :rtype: None
+        """
         assert self.camera is not None, CameraQPD.CAMERA_MODULE_ERROR
         pass
 
-    def adjustZeroDist(self, inc) -> None:
+    def adjustZeroDist(self, inc):
+        """
+        :type inc: int
+        :rtype: None
+        """
         pass
 
-    def changeFitMode(self, mode) -> None:
+    def changeFitMode(self, mode):
+        """
+        :type mode: int
+        :rtype: None
+        """
         pass
 
-    def getMinimumInc(self) -> int:
+    def getMinimumInc(self):
+        """
+        :rtype: int
+        """
         return 2
 
     def getOffset(self):

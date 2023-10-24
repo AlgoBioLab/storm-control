@@ -8,9 +8,21 @@ import storm_control.sc_hardware.utility.np_lock_peak_finder as npLPF
 
 
 class CameraQPDFitResults:
-    def __init__(self, power: float, total_good: float, offset: float,
-                 dist1: float, dist2: float, image: np.ndarray, x_off1: float,
-                 y_off1: float, x_off2: float, y_off2: float, sigma: float):
+    def __init__(self, power, total_good, offset, dist1, dist2, image, x_off1,
+                 y_off1, x_off2, y_off2, sigma):
+        """
+        :type power: float
+        :type total_good: float
+        :type offset: float
+        :type dist1: float
+        :type dist2: float
+        :type image: np.ndarray
+        :type x_off1: float
+        :type y_off1: float
+        :type x_off2: float
+        :type y_off2: float
+        :type sigma: float
+        """
         self.power = power
         self.total_good = total_good
         self.offset = offset
@@ -25,8 +37,16 @@ class CameraQPDFitResults:
 
 
 class FitIntemediateResults:
-    def __init__(self, total_good: int, dist1: float, dist2: float,
-                 x_off1: float, y_off1: float, x_off2: float, y_off2: float):
+    def __init__(self, total_good, dist1, dist2, x_off1, y_off1, x_off2, y_off2):
+        """
+        :type total_good: int
+        :type dist1: float
+        :type dist2: float
+        :type x_off1: float
+        :type y_off1: float
+        :type x_off2: float
+        :type y_off2: float
+        """
         self.total_good = total_good
         self.dist1 = dist1
         self.dist2 = dist2
@@ -53,9 +73,12 @@ class CameraQPDFit(HalModule, HalFunctionality):
     def doFit(self, data: np.ndarray) -> FitIntemediateResults:
         pass
 
-    def singleQpdScan(self, image: np.ndarray) -> CameraQPDFitResults:
+    def singleQpdScan(self, image):
         """
         Perform a single measurement of the focus lock offset and camera sum signal.
+
+        :type image: np.ndarray
+        :rtype: CameraQPDFitResults
         """
         # The power number is the sum over the camera AOI minus the background.
         power = float(np.sum(image.astype(np.int64)) - self.background)
@@ -166,7 +189,13 @@ class CameraQPDScipyFit(CameraQPDFit):
     `storm_control/sc_hardware/thorlabs/uc480Camera.py`
     """
     class GaussianResult:
-        def __init__(self, max_x: float, max_y: float, params: object, status: bool):
+        def __init__(self, max_x, max_y, params, status):
+            """
+            :type max_x: float
+            :type max_y: float
+            :type params: object
+            :type status: bool
+            """
             self.max_x = max_x
             self.max_y = max_y
             self.params = params
@@ -179,7 +208,10 @@ class CameraQPDScipyFit(CameraQPDFit):
 
         self.fit_size = int(1.5 * self.sigma)
 
-    def doFit(self, data) -> FitIntemediateResults:
+    def doFit(self, data):
+        """
+        :rtype: FitIntemediateResults
+        """
         dist1 = 0
         dist2 = 0
 
@@ -212,7 +244,10 @@ class CameraQPDScipyFit(CameraQPDFit):
 
         return FitIntemediateResults(total_good, dist1, dist2, x_off1, y_off1, x_off2, y_off2)
 
-    def fitGaussian(self, data) -> GaussianResult:
+    def fitGaussian(self, data):
+        """
+        :rtype: GaussianResult
+        """
         if (np.max(data) < 25):
             return CameraQPDScipyFit.GaussianResult(0.0, 0.0, None, False)
         x_width = data.shape[0]
