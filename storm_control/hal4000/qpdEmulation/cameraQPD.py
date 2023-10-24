@@ -206,8 +206,9 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
             # Request the fit object
             self.sendMessage(halMessage.HalMessage(m_type='get functionality',
                                                    data={ 'name': self.fit_module }))
-        if message.isType('get functionality'):
-            self.getFunctionality(message)
+        if message.isType('get functionality') and message.getData()['name'] == self.module_name:
+            message.addResponse(halMessage.HalMessageResponse(source = self.module_name,
+                                                              data = {"functionality" : self}))
 
     def startQPDThread(self) -> None:
         # Create the thread
@@ -239,7 +240,7 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         pass
 
     def getMinimumInc(self) -> int:
-        return 0
+        return 2
 
     def getOffset(self):
         #
@@ -248,8 +249,3 @@ class CameraQPD(hardwareModule.HardwareModule, lockModule.QPDCameraFunctionality
         #
         if not self.scan_thread.isRunning():
             self.scan_thread.startScan()
-
-    def getFunctionality(self, message):
-        if (message.getData()["name"] == self.module_name):
-            message.addResponse(halMessage.HalMessageResponse(source = self.module_name,
-                                                              data = {"functionality" : self}))
