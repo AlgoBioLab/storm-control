@@ -40,7 +40,7 @@ class ScientificCamera(Camera):
         super().__init__(**kwds)
 
         configuration = module_params.get('configuration')
-        self.dll_path = configuration.get('ddl_path')
+        self.dll_path = configuration.get('dll_path')
         self.camera_id = configuration.get('camera_id')
         self.exposure_time = configuration.get('exposure_time_us')
         self.timeout = configuration.get('timeout_ms')
@@ -53,7 +53,7 @@ class ScientificCamera(Camera):
 
         # Select the correct camera (if multiple exist)
         available_cameras = self.sdk.discover_available_cameras()
-        assert len(available_cameras) < self.camera_id, 'camera_id must be a valid index'
+        assert len(available_cameras) > self.camera_id, 'camera_id must be a valid index'
         self.camera = self.sdk.open_camera(available_cameras[self.camera_id])
 
         # Load camera settings
@@ -62,7 +62,7 @@ class ScientificCamera(Camera):
         self.camera.image_poll_timeout_ms = self.timeout
 
         # TODO: Handle dynamic change of AOI
-        self.camera.roi = (700, 828, 875, 903)
+        self.camera.roi = (1100, 400, 1300, 600)
 
         self.camera.arm(2)
         self.camera.issue_software_trigger()
@@ -77,8 +77,8 @@ class ScientificCamera(Camera):
             raise 'Failed to get a frame'
         image = np.copy(frame.image_buffer)
 
-        # Bound the image values from 0-255
-        return ((image - image.min()) * (1/(image.max() - image.min()) * 255)).astype('uint8')
+        # Conver to uint8
+        return image.astype('uint8')
 
     def getTimeout(self) -> float:
         return 0.0

@@ -11,7 +11,7 @@ import storm_control.hal4000.halLib.halMessage as halMessage
 
 import storm_control.sc_hardware.baseClasses.hardwareModule as hardwareModule
 import storm_control.sc_hardware.baseClasses.lockModule as lockModule
-import storm_control.sc_hardware.thorlabs.scientificCamera as uc480Camera
+import storm_control.sc_hardware.thorlabs.scientificCamera_old as uc480Camera
 
 
 class UC480QPDCameraFunctionality(hardwareModule.BufferedFunctionality, lockModule.QPDCameraFunctionalityMixin):
