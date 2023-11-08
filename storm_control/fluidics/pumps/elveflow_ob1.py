@@ -17,6 +17,7 @@ class APump():
         self.pump_ID = parameters.get("pump_id", -1) # OB1 ID
         self.verbose = parameters.get("verbose", True)
         self.simulate = parameters.get("simulate_pump", False)
+        self.set_channel = parameters.get("channel", 1)
         # TODO: Likely need to add channel info here and to the Kilroy settings
 
         # Define initial pump status
@@ -34,12 +35,25 @@ class APump():
 
         # TODO.
         # OB1_Initialization
-        #           (Give it the OB1 device name and get back an OB1 ID)
+        Instr_ID=c_int32()
+        print("Instrument name and regulator types are hardcoded in the Python script")
+        error=OB1_Initialization('01A1E91E'.encode('ascii'),1,2,4,3,byref(Instr_ID))
+        #all functions will return error codes to help you to debug your code, for further information refer to User Guide
+        print('error:%d' % error)
+        print("OB1 ID: %d" % Instr_ID.value)
+        error=OB1_Add_Sens(Instr_ID, 1, 4, 1, 0, 7, 0) # TODO fix parameters
+        #(CustomSens_Voltage_5_to_25 only works with CustomSensors and OB1 from 2020 and after)
+        print('error add digit flow sensor:%d' % error)
         # OB1_Add_Sens
-        #           (Set up flow sensor)
+        error=OB1_Add_Sens(Instr_ID, 1, 5, 0, 0, 7, 0) # TODO fix parameters
+        #(CustomSens_Voltage_5_to_25 only works with CustomSensors and OB1 from 2020 and after)
+        print('error add analog flow sensor:%d' % error)
+        Calib=(c_double*1000)()
         # OB1_Start_Remote_Measurement
+        OB1_Start_Remote_Measurement(Instr_ID.value, byref(Calib), 1000)
+        #
 
-        self.pump_ID = 1 # set to whatever is returned by _Initialization; check that it is not -1
+        self.pump_ID = Instr_ID.value # set to whatever is returned by _Initialization; check that it is not -1
 
 
     def calibratePump(self):
@@ -49,16 +63,28 @@ class APump():
 
         # TODO
         # OB1_Calib
+        Calib=(c_double*1000)()#always define array this way, calibration should have 1000 elements
+        error=Elveflow_Calibration_Default (byref(Calib),1000)
+        #for i in range (0,1000):
+        #    print('[',i,']: ',Calib[i])
         # See also Elveflow_Calibration_[Default,Save,Load]
         # May have to stop remote workflow, calibrate, and then restart remote workflow
         # Otherwise, would have to check if loop is active on every setSpeed - not sure if possible/practical
-        pass
+
+
 
 
     def getStatus(self):
         if self.simulate:
-            return [self.flow_status, self.speed]
 
+            return [self.flow_status, self.speed]
+        data_sens=c_double()
+        error=OB1_Get_Remote_Data(Instr_ID.value,self.set_channel, 1,byref(data_sens))
+        self.speed = data_sens.value
+        if self.speed = 0:
+            self.flow_status = "Stopped"
+        else:
+            self.flow_status = "Flowing"
         # TODO
         # Set self.flow_status and self.speed
         # Probably according to output of OB1_Get_Remote_Data
@@ -71,7 +97,10 @@ class APump():
     def close(self):
         if self.simulate:
             print("Closed simulated OB1 pump.")
+            
             return
+        error=OB1_Stop_Remote_Measurement(Instr_ID.value)
+        error=OB1_Destructor(Instr_ID.value)
         # TODO OB1_Stop_Remote_Measurement
         # TODO OB1_Destructor
 
@@ -81,6 +110,8 @@ class APump():
 
         if self.simulate:
             self.speed = speed
+        error=OB1_Set_Remote_Target(Instr_ID.value, self.set_channel, speed)
+            
 
         # TODO
         # Probably OB1_Set_Remote_Target and not OB1_Set_Press
