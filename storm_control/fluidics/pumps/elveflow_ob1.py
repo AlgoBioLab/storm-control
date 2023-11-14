@@ -5,6 +5,13 @@
 
 # TODO: for dlls:
 import ctypes
+import sys
+from email.header import UTF8
+sys.path.append('C:\Users\RPI\AppData\Local\Temp\3e1d629a-890d-411e-8edb-ee0b7bbf22a9_ESI_V3_07_04.zip.2a9\ESI_V3_07_04\SDK_V3_07_04.zip\SDK_V3_07_04\SDK_V3_07_04\DLL64'.encode('utf-8'))
+sys.path.append('C:\Users\RPI\AppData\Local\Temp\3e1d629a-890d-411e-8edb-ee0b7bbf22a9_ESI_V3_07_04.zip.2a9\ESI_V3_07_04\SDK_V3_07_04.zip\SDK_V3_07_04\SDK_V3_07_04'.encode('utf-8'))
+from array import array
+from Elveflow64 import *
+
 
 class APump():
     """ Elveflow OB1 MK4 """
@@ -41,9 +48,9 @@ class APump():
         #all functions will return error codes to help you to debug your code, for further information refer to User Guide
         print('error:%d' % error)
         print("OB1 ID: %d" % Instr_ID.value)
-        error=OB1_Add_Sens(Instr_ID, 1, 4, 1, 0, 7, 0) # TODO fix parameters
-        #(CustomSens_Voltage_5_to_25 only works with CustomSensors and OB1 from 2020 and after)
-        print('error add digit flow sensor:%d' % error)
+        #error=OB1_Add_Sens(Instr_ID, 1, 4, 1, 0, 7, 0) # TODO fix parameters
+        ##(CustomSens_Voltage_5_to_25 only works with CustomSensors and OB1 from 2020 and after)
+        #print('error add digit flow sensor:%d' % error)
         # OB1_Add_Sens
         error=OB1_Add_Sens(Instr_ID, 1, 5, 0, 0, 7, 0) # TODO fix parameters
         #(CustomSens_Voltage_5_to_25 only works with CustomSensors and OB1 from 2020 and after)
@@ -81,7 +88,7 @@ class APump():
         data_sens=c_double()
         error=OB1_Get_Remote_Data(Instr_ID.value,self.set_channel, 1,byref(data_sens))
         self.speed = data_sens.value
-        if self.speed = 0:
+        if self.speed == 0:
             self.flow_status = "Stopped"
         else:
             self.flow_status = "Flowing"
