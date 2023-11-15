@@ -246,6 +246,7 @@ class CameraQPDScipyFit(CameraQPDFit):
             dist1 = abs(y_off1)
 
         # Fit second gaussian to data in the right half of the picture.
+        gaussian_result = self.fitGaussian(data[:, -half_x:])
         if gaussian_result.status:
             total_good += 1
             x_off2 = float(gaussian_result.max_x) + gaussian_result.params[2] \

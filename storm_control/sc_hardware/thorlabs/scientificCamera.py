@@ -62,7 +62,7 @@ class ScientificCamera(Camera):
         self.camera.image_poll_timeout_ms = self.timeout
 
         # TODO: Handle dynamic change of AOI
-        self.camera.roi = (1014, 194, 1414, 594)
+        self.camera.roi = (1220, 140, 1300, 220)
 
         self.camera.arm(2)
         self.camera.issue_software_trigger()
@@ -75,10 +75,10 @@ class ScientificCamera(Camera):
         if frame is None:
             # TODO: More cleanly handle failed frame grabs
             raise 'Failed to get a frame'
-        image = np.copy(frame.image_buffer)
+        image = np.copy(frame.image_buffer).astype('uint8')
 
         # Conver to uint8
-        return image.astype('uint8')
+        return image
 
     def getTimeout(self) -> float:
         return 0.0
