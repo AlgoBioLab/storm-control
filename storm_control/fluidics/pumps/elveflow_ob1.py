@@ -7,8 +7,10 @@
 import ctypes
 import sys
 from email.header import UTF8
-sys.path.append('C:\Users\RPI\AppData\Local\Temp\3e1d629a-890d-411e-8edb-ee0b7bbf22a9_ESI_V3_07_04.zip.2a9\ESI_V3_07_04\SDK_V3_07_04.zip\SDK_V3_07_04\SDK_V3_07_04\DLL64'.encode('utf-8'))
-sys.path.append('C:\Users\RPI\AppData\Local\Temp\3e1d629a-890d-411e-8edb-ee0b7bbf22a9_ESI_V3_07_04.zip.2a9\ESI_V3_07_04\SDK_V3_07_04.zip\SDK_V3_07_04\SDK_V3_07_04'.encode('utf-8'))
+# TODO this should probably be configurable but for now these are the correct paths
+sys.path.append('C:/Users/RPI/Desktop/ESI_V3_07_04/ESI_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/Python_64/DLL64')#add the path of the library here
+sys.path.append('C:/Users/RPI/Desktop/ESI_V3_07_04/ESI_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/Python_64')#add the path of the LoadElveflow.py
+
 from array import array
 from Elveflow64 import *
 
@@ -44,7 +46,7 @@ class APump():
         # OB1_Initialization
         Instr_ID=c_int32()
         print("Instrument name and regulator types are hardcoded in the Python script")
-        error=OB1_Initialization('01A1E91E'.encode('ascii'),1,2,4,3,byref(Instr_ID))
+        error=OB1_Initialization('COM7'.encode('ascii'),1,2,4,3,byref(Instr_ID))
         #all functions will return error codes to help you to debug your code, for further information refer to User Guide
         print('error:%d' % error)
         print("OB1 ID: %d" % Instr_ID.value)
@@ -86,7 +88,7 @@ class APump():
 
             return [self.flow_status, self.speed]
         data_sens=c_double()
-        error=OB1_Get_Remote_Data(Instr_ID.value,self.set_channel, 1,byref(data_sens))
+        error=OB1_Get_Remote_Data(self.pump_ID,self.set_channel, 1,byref(data_sens))
         self.speed = data_sens.value
         if self.speed == 0:
             self.flow_status = "Stopped"
@@ -106,8 +108,8 @@ class APump():
             print("Closed simulated OB1 pump.")
             
             return
-        error=OB1_Stop_Remote_Measurement(Instr_ID.value)
-        error=OB1_Destructor(Instr_ID.value)
+        error=OB1_Stop_Remote_Measurement(self.pump_ID)
+        error=OB1_Destructor(self.pump_ID)
         # TODO OB1_Stop_Remote_Measurement
         # TODO OB1_Destructor
 
@@ -117,7 +119,9 @@ class APump():
 
         if self.simulate:
             self.speed = speed
-        error=OB1_Set_Remote_Target(Instr_ID.value, self.set_channel, speed)
+        set_channel=int(self.set_channel)#convert to int
+        set_channel=c_int32(set_channel)#convert to c_int32
+        error=OB1_Set_Remote_Target(self.pump_ID, set_channel, speed)
             
 
         # TODO
