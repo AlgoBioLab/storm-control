@@ -62,7 +62,7 @@ class ScientificCamera(Camera):
         self.camera.image_poll_timeout_ms = self.timeout
 
         # TODO: Handle dynamic change of AOI
-        self.camera.roi = (1220, 140, 1300, 220)
+        self.camera.roi = (1200, 380, 1280, 460)
 
         self.camera.arm(2)
         self.camera.issue_software_trigger()
