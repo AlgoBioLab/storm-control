@@ -2,6 +2,15 @@
 # ----------------------------------------------------------------------------------------
 # For Elveflow MUX Distribution Valves
 # ----------------------------------------------------------------------------------------
+import sys
+sys.path.append('C:/Users/RPI/Desktop/ESI_V3_07_04/ESI_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/Python_64/DLL64')#add the path of the library here
+sys.path.append('C:/Users/RPI/Desktop/ESI_V3_07_04/ESI_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/Python_64')#add the path of the LoadElveflow.py
+
+from ctypes import *
+
+from array import array
+
+from Elveflow64 import *
 
 from storm_control.fluidics.valves.valve import AbstractValve
 
