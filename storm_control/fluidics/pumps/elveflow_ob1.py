@@ -84,9 +84,11 @@ class APump():
         # TODO
         # OB1_Calib
         Calib=(c_double*1000)()#always define array this way, calibration should have 1000 elements
-        error=Elveflow_Calibration_Default (byref(Calib),1000)
+        print('Calibrating')
+        error=Elveflow_Calibration_Default(byref(Calib),1000)
         #for i in range (0,1000):
         #    print('[',i,']: ',Calib[i])
+        repeat = False
         # See also Elveflow_Calibration_[Default,Save,Load]
         # May have to stop remote workflow, calibrate, and then restart remote workflow
         # Otherwise, would have to check if loop is active on every setSpeed - not sure if possible/practical
@@ -99,7 +101,8 @@ class APump():
 
             return [self.flow_status, self.speed]
         data_sens=c_double()
-        error=OB1_Get_Remote_Data(self.pump_ID,self.set_channel, 1,byref(data_sens))
+        data_reg=c_double()
+        error=OB1_Get_Remote_Data(self.pump_ID,self.set_channel, byref(data_reg),byref(data_sens))
         self.speed = data_sens.value
         if self.speed == 0:
             self.flow_status = "Stopped"
