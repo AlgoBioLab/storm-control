@@ -6,6 +6,7 @@
 # TODO: for dlls:
 import ctypes
 import sys
+from _ast import Load
 from email.header import UTF8
 # TODO this should probably be configurable but for now these are the correct paths
 sys.path.append('C:/Users/RPI/Desktop/ESI_V3_07_04/ESI_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/Python_64/DLL64')#add the path of the library here
@@ -54,12 +55,22 @@ class APump():
         ##(CustomSens_Voltage_5_to_25 only works with CustomSensors and OB1 from 2020 and after)
         #print('error add digit flow sensor:%d' % error)
         # OB1_Add_Sens
-        error=OB1_Add_Sens(Instr_ID, 1, 5, 0, 0, 7, 0) # TODO fix parameters
-        #(CustomSens_Voltage_5_to_25 only works with CustomSensors and OB1 from 2020 and after)
-        print('error add analog flow sensor:%d' % error)
-        Calib=(c_double*1000)()
-        # OB1_Start_Remote_Measurement
+        BFS_ID=c_int32()
+        print("Instrument name is hardcoded in the Python script")
+        #see User Guide and NIMAX to determine the instrument name 
+        error=BFS_Initialization("ASRL5::INSTR".encode('ascii'),byref(BFS_ID))
+        #all functions will return error codes to help you to debug your code, for further information refer to User Guide
+        print('error:%d' % error)
+        print("BFS ID: %d" % BFS_ID.value)
+        # add remote PID
+        PID_Add_Remote(Instr_ID.value, set_channel_regulator, BFS_ID.value, set_channel_sensor,10,0.1,1)
+        # Start Remote Measurement
+        BFS_Start_Remote_Measurement(BFS_ID.value)
         OB1_Start_Remote_Measurement(Instr_ID.value, byref(Calib), 1000)
+        # Run PID
+        PID_Set_Running_Remote(BFS_ID.value,self.set_channel,Running)
+        # Change P and I settings
+        PID_Set_Params_Remote()
         #
 
         self.pump_ID = Instr_ID.value # set to whatever is returned by _Initialization; check that it is not -1
