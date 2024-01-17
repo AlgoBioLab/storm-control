@@ -1,6 +1,6 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------------
-# A wrapper class for the Hamilton MVP valve chain and the Widgets that display
+# A wrapper class for the valve chain and the Widgets that display
 # their status.  All interactions with the valve chain should go through this
 # class.
 # ----------------------------------------------------------------------------------------
@@ -32,21 +32,20 @@ class ValveChain(QtWidgets.QWidget):
         QtWidgets.QWidget.__init__(self, parent)
         
         # Define local attributes
-        self.com_port = parameters.get("valves_com_port", None)
+        self.com_port = parameters.get("valves_com_port", "COM2")
         self.verbose = parameters.get("verbose", False)
         self.poll_time = 2000
         
         # Simulate the valves?
         num_simulated_valves = parameters.get("num_simulated_valves", 0)
         
-        if num_simulated_valves > 0:
+        # Backwards compatibility in valve_type
+        valve_type = parameters.get("valve_type", "None")
+        if num_simulated_valves > 0 and valve_type == 'Hamilton':
             self.valve_chain = HamiltonMVP(com_port = 0,
 				   num_simulated_valves = num_simulated_valves,
 				   verbose = self.verbose)
         else: # Create the valve
-            # Backwards compatibility in valve_type
-            valve_type = parameters.get("valve_type", "None")
-
             if valve_type == 'Hamilton':	
                 self.valve_chain = HamiltonMVP(com_port = self.com_port,
                                                verbose = self.verbose)

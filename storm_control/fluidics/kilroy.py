@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # ----------------------------------------------------------------------------------------
 # A master control class to implemented a series of automated flow protocols
-# using a daisy chained valve system and peristaltic or syringe pumps
+# using a daisy chained valve system and peristaltic, syringe, or pressure pumps
 # ----------------------------------------------------------------------------------------
 # Jeff Moffitt
 # 12/28/13
@@ -65,6 +65,8 @@ class Kilroy(QtWidgets.QMainWindow):
             self.pumpControl = pumpControl.PeristalticPumpControl(parameters = parameters)
         elif pump_type == "syringe":
             self.pumpControl = pumpControl.SyringePumpControl(parameters = parameters)
+        elif pump_type == "pressure":
+            self.pumpControl = pumpControl.PressurePumpControl(parameters = parameters)
         else:
             print("Unrecognized pump_type requested")
             assert False
@@ -254,9 +256,9 @@ if __name__ == "__main__":
 
     # Load parameters
     if len(sys.argv) == 2:
-        parameters = params.parameters(sys.argv[1])
+        parameters = params.parameters(sys.argv[1], recurse=True)
     else:
-        parameters = params.parameters("kilroy_settings_default.xml")
+        parameters = params.parameters("kilroy_settings_default.xml", recurse=True)
 
     # Create instance of StandAlone class
     window = StandAlone(parameters)
