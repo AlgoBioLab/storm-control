@@ -180,7 +180,7 @@ class Dave(QtWidgets.QMainWindow):
         self.ui.spaceLabel.setText("")
         self.ui.timeLabel.setText("")
 
-        self.directory = str(self.settings.value("directory", ""))
+        self.directory = str(parameters.get("directory", ""))
         self.move(self.settings.value("position", self.pos()))
         self.resize(self.settings.value("size", self.size()))
         
