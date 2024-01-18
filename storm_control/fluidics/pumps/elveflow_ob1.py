@@ -122,6 +122,7 @@ class APump():
 
         if self.simulate:
             self.speed = speed
+            return
         set_channel=int(self.set_channel)#convert to int
         set_channel=c_int32(set_channel)#convert to c_int32
         error=OB1_Set_Remote_Target(self.pump_ID, set_channel, speed)
