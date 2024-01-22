@@ -2,6 +2,8 @@
 # ----------------------------------------------------------------------------------------
 # For Elveflow MUX Distribution Valves
 # ----------------------------------------------------------------------------------------
+import time
+
 import sys
 sys.path.append('C:/Users/RPI/Desktop/ESI_V3_07_04/ESI_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/Python_64/DLL64')#add the path of the library here
 sys.path.append('C:/Users/RPI/Desktop/ESI_V3_07_04/ESI_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/SDK_V3_07_04/Python_64')#add the path of the LoadElveflow.py
@@ -50,7 +52,8 @@ class AValveChain(AbstractValve):
         for com_port in self.com_ports.getAttrs():
             # MUX_DRI_Initialization - give visa COM port, get MUX DRI ID.
             # It might want ASRLX[X]::INSTR instead of COMX[X].
-            valve_dri_id = com_port # change this to MUX DRI ID.
+            Instr_ID=c_int32()
+            valve_dri_id=MUX_DRI_Initialization("com_port".encode('ascii'),byref(Instr_ID))
             self.valve_dri_ids.append(valve_dri_id)
             # check for error code and raise exception if fail.
 
@@ -59,6 +62,10 @@ class AValveChain(AbstractValve):
         # Home the valves
         print("Homing valves.")
         # MUX_DRI_Send_Command
+        Answer=(c_char*40)()
+        for valv_id in self.valve_dri_ids:
+            error=MUX_DRI_Send_Command(valv_id.value,0,Answer,40)
+            time.sleep(15)
 
 
     def changePort(self, valve_ID, port_ID, direction = 0):
@@ -77,6 +84,16 @@ class AValveChain(AbstractValve):
             return
 
         # MUX_DRI_Set_Valve
+        if valve_ID=='1':
+            Valve_ID=self.valve_dri_ids[0]
+        if valve_ID=='2':
+            Valve_ID=self.valve_dri_ids[1]
+        if valve_ID=='3':
+            Valve_ID=self.valve_dri_ids[2]
+        
+        port_ID=int(port_ID)
+        port_ID=c_int32(port_ID)
+        error=MUX_DRI_Set_Valve(Valve_ID.value,port_ID,direction)
 
 
     def howManyValves(self):
@@ -90,6 +107,8 @@ class AValveChain(AbstractValve):
             return
 
         # MUX_DRI_Destructor
+        for valv_id in self.valve_dri_ids:
+            error=MUX_DRI_Destructor(valv_id.value)
 
 
     def getDefaultPortNames(self, valve_ID):
@@ -131,6 +150,10 @@ class AValveChain(AbstractValve):
 
         # Home the valves
         # MUX_DRI_Send_Command
+        Answer=(c_char*40)()
+        for valv_id in self.valve_dri_ids:
+            error=MUX_DRI_Send_Command(valv_id.value,0,Answer,40)
+            time.sleep(15)
 
 
     def getRotationDirections(self, valve_ID):
