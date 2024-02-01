@@ -63,14 +63,15 @@ class APump():
         print('error:%d' % error)
         print("BFS ID: %d" % BFS_ID.value)
         # add remote PID
-        PID_Add_Remote(Instr_ID.value, set_channel_regulator, BFS_ID.value, set_channel_sensor,10,0.1,1)
+        #PID_Add_Remote(Instr_ID.value, set_channel_regulator, BFS_ID.value, set_channel_sensor,10,0.1,1)
         # Start Remote Measurement
+        Calib=(c_double*1000)()
         BFS_Start_Remote_Measurement(BFS_ID.value)
         OB1_Start_Remote_Measurement(Instr_ID.value, byref(Calib), 1000)
         # Run PID
-        PID_Set_Running_Remote(BFS_ID.value,self.set_channel,Running)
+        #PID_Set_Running_Remote(BFS_ID.value,self.set_channel,Running)
         # Change P and I settings
-        PID_Set_Params_Remote()
+        #PID_Set_Params_Remote()
         #
 
         self.pump_ID = Instr_ID.value # set to whatever is returned by _Initialization; check that it is not -1
