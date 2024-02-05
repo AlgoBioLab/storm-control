@@ -48,13 +48,18 @@ class AValveChain(AbstractValve):
             self.simulated_valve_posns = [0 for i in range(self.num_valves)]
             print(f"Simulating {self.num_valves} Elveflow MUX valves.")
             return
-
-        for com_port in self.com_ports.getAttrs():
+        #for com_port in self.com_ports.getAttrs():
+        #import pdb; pdb.set_trace()
+        for i in [8,9,10]:
             # MUX_DRI_Initialization - give visa COM port, get MUX DRI ID.
             # It might want ASRLX[X]::INSTR instead of COMX[X].
             Instr_ID=c_int32()
-            valve_dri_id=MUX_DRI_Initialization("com_port".encode('ascii'),byref(Instr_ID))
-            self.valve_dri_ids.append(valve_dri_id)
+            
+            #valve_dri_id=MUX_DRI_Initialization(f"COM{i}".encode('ascii'),byref(Instr_ID))
+            valve_dri_id=MUX_DRI_Initialization(f"ASRL{i}::INSTR".encode('ascii'),byref(Instr_ID))
+            self.valve_dri_ids.append(Instr_ID.value)
+            #print(com_port)
+            print(valve_dri_id)
             # check for error code and raise exception if fail.
 
         self.num_valves = len(self.valve_dri_ids)
@@ -64,7 +69,7 @@ class AValveChain(AbstractValve):
         # MUX_DRI_Send_Command
         Answer=(c_char*40)()
         for valv_id in self.valve_dri_ids:
-            error=MUX_DRI_Send_Command(valv_id.value,0,Answer,40)
+            error=MUX_DRI_Send_Command(valv_id,0,Answer,40)
             time.sleep(15)
 
 
@@ -84,6 +89,7 @@ class AValveChain(AbstractValve):
             return
 
         # MUX_DRI_Set_Valve
+        Valve_ID=int()
         if valve_ID=='1':
             Valve_ID=self.valve_dri_ids[0]
         if valve_ID=='2':
@@ -93,7 +99,8 @@ class AValveChain(AbstractValve):
         
         port_ID=int(port_ID)
         port_ID=c_int32(port_ID)
-        error=MUX_DRI_Set_Valve(Valve_ID.value,port_ID,direction)
+        print(Valve_ID)
+        error=MUX_DRI_Set_Valve(Valve_ID,port_ID,direction)
 
 
     def howManyValves(self):
@@ -108,7 +115,7 @@ class AValveChain(AbstractValve):
 
         # MUX_DRI_Destructor
         for valv_id in self.valve_dri_ids:
-            error=MUX_DRI_Destructor(valv_id.value)
+            error=MUX_DRI_Destructor(valv_id)
 
 
     def getDefaultPortNames(self, valve_ID):
@@ -152,7 +159,7 @@ class AValveChain(AbstractValve):
         # MUX_DRI_Send_Command
         Answer=(c_char*40)()
         for valv_id in self.valve_dri_ids:
-            error=MUX_DRI_Send_Command(valv_id.value,0,Answer,40)
+            error=MUX_DRI_Send_Command(valv_id,0,Answer,40)
             time.sleep(15)
 
 
