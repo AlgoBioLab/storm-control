@@ -201,6 +201,8 @@ class CameraQPD(hardwareModule.HardwareModule,
         with open(self.offset_file_location, 'r') as offset_file:
             self.aoi_x_start, self.aoi_y_start = \
                 offset_file.readline().split(',')[:2]
+            self.aoi_x_start = int(self.aoi_x_start)
+            self.aoi_y_start = int(self.aoi_y_start)
 
         self.units_to_microns = configuration.get('units_to_microns')
         self.reps = configuration.get('reps')
@@ -217,6 +219,7 @@ class CameraQPD(hardwareModule.HardwareModule,
         is_functionality = message.isType('get functionality')
         if is_functionality and response.source == self.camera_module:
             self.camera = response.getData()['functionality']
+            self.camera.setAOI(self.aoi_x_start, self.aoi_y_start, self.aoi_width, self.aoi_height)
         elif is_functionality and response.source == self.fit_module:
             self.fit_approach = response.getData()['functionality']
 
@@ -275,11 +278,12 @@ class CameraQPD(hardwareModule.HardwareModule,
     # QPDCameraFunctionalityMixin
     def adjustAOI(self, dx, dy):
         """
+        Not currently supported
+
         :type dx: int
         :type dy: int
         :rtype: None
         """
-        assert self.camera is not None, CameraQPD.CAMERA_MODULE_ERROR
         pass
 
     def adjustZeroDist(self, inc):
