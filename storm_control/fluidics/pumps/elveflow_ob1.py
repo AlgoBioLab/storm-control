@@ -62,15 +62,22 @@ class APump():
         #all functions will return error codes to help you to debug your code, for further information refer to User Guide
         print('error:%d' % error)
         print("BFS ID: %d" % BFS_ID.value)
+        error1 = BFS_Get_Density(Instr_ID.value,byref(density))
+        error2 = BFS_Get_Flow(Instr_ID.value,byref(flow))
+        print(error1)
+        print(error2)
         # add remote PID
         PID_Add_Remote(Instr_ID.value, 1, BFS_ID.value, 1,10,0.1,1)
         # Start Remote Measurement
         Calib=(c_double*1000)()
+        
+        
         BFS_Start_Remote_Measurement(BFS_ID.value)
         OB1_Start_Remote_Measurement(Instr_ID.value, byref(Calib), 1000)
         # Run PID
         PID_Set_Running_Remote(Instr_ID.value,1,1)
         # Change P and I settings--currently set to 10 and 0.1
+        # used 0.3-0.5
         #PID_Set_Params_Remote(Instr_ID.value,1,1,P,I)
         #
 
