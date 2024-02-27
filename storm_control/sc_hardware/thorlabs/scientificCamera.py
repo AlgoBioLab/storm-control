@@ -61,23 +61,36 @@ class ScientificCamera(Camera):
         self.camera.frames_per_trigger_zero_for_unlimited = 0
         self.camera.image_poll_timeout_ms = self.timeout
 
-        # TODO: Handle dynamic change of AOI
         self.camera.roi = (1200, 400, 1280, 480)
+        self.max_height = self.camera.image_height_pixels
+        self.max_width = self.camera.image_width_pixels
 
         self.camera.arm(2)
         self.camera.issue_software_trigger()
 
+        # This count is to handle how many empty frames can be sent.
+        # Empty frames are generated when a frame is not retrieved
+        # by the camera
+        self.max_empty_frames = 5
+        self.num_empty_frames = 0
 
     def getImage(self) -> np.ndarray:
         if not self.sdk._is_sdk_open:
             return None
+
         frame = self.camera.get_pending_frame_or_null()
         if frame is None:
-            # TODO: More cleanly handle failed frame grabs
-            raise 'Failed to get a frame'
+            if self.num_empty_frames >= self.max_empty_frames:
+                # TODO: More cleanly handle failed frame grabs
+                raise 'Failed to get a frame'
+            else:
+                # NOTE: Logic around allowing a number of empty frames is to
+                # allow for the camera to re-arm after an AOI change
+                self.num_empty_frames += 1
+                return np.zeros((self.height, self.width))
+        self.num_empty_frames = 0
         image = np.copy(frame.image_buffer).astype('uint8')
 
-        # Conver to uint8
         return image
 
     def getTimeout(self) -> float:
@@ -87,10 +100,20 @@ class ScientificCamera(Camera):
         pass
 
     def getAOI(self) -> Tuple[int, int, int, int]:
-        pass
+        return [self.x_start, self.y_start, self.width, self.height]
 
     def setAOI(self, x_start: int, y_start: int, width: int, height: int) -> None:
-        pass
+        self.camera.disarm()
+        self.x_start = x_start
+        self.y_start = y_start
+        self.width = width
+        self.height = height
+        self.camera.roi = (self.x_start, self.y_start, self.x_start + self.width, self.y_start + self.height)
+        self.camera.arm(2)
+        self.camera.issue_software_trigger()
+    
+    def get_max_height_width(self):
+        return (self.max_height, self.max_width)
 
     def shutdown(self) -> None:
         pass
