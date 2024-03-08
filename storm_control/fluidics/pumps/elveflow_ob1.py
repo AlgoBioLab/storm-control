@@ -58,14 +58,14 @@ class APump():
         BFS_ID=c_int32()
         print("Instrument name is hardcoded in the Python script")
         #see User Guide and NIMAX to determine the instrument name 
-        error=BFS_Initialization("ASRL5::INSTR".encode('ascii'),byref(BFS_ID))
+        error=BFS_Initialization("ASRL11::INSTR".encode('ascii'),byref(BFS_ID))
         #all functions will return error codes to help you to debug your code, for further information refer to User Guide
         print('error:%d' % error)
         print("BFS ID: %d" % BFS_ID.value)
-        error1 = BFS_Get_Density(Instr_ID.value,byref(density))
-        error2 = BFS_Get_Flow(Instr_ID.value,byref(flow))
-        print(error1)
-        print(error2)
+        #error1 = BFS_Get_Density(Instr_ID.value,byref(density))
+        #error2 = BFS_Get_Flow(Instr_ID.value,byref(flow))
+        #print(error1)
+        #print(error2)
         # add remote PID
         PID_Add_Remote(Instr_ID.value, 1, BFS_ID.value, 1,10,0.1,1)
         # Start Remote Measurement
