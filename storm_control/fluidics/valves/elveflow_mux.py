@@ -61,7 +61,7 @@ class AValveChain(AbstractValve):
             #print(com_port)
             print(valve_dri_id)
             # check for error code and raise exception if fail.
-
+        print(self.valve_dri_ids)
         self.num_valves = len(self.valve_dri_ids)
 
         # Home the valves
@@ -100,6 +100,7 @@ class AValveChain(AbstractValve):
         port_ID=int(port_ID)
         port_ID=c_int32(port_ID)
         print(Valve_ID)
+        print(port_ID)
         error=MUX_DRI_Set_Valve(Valve_ID,port_ID,direction)
 
 

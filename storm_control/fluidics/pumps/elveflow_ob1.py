@@ -25,6 +25,7 @@ class APump():
         # Define attributes
         self.identification = "Elveflow OB1" # For GUI only
         self.pump_ID = parameters.get("pump_id", -1) # OB1 ID
+        self.BFS_ID = parameters.get("BFS_id", -1) # BFS ID
         self.verbose = parameters.get("verbose", True)
         self.simulate = parameters.get("simulate_pump", False)
         self.set_channel = parameters.get("channel", 1)
@@ -47,7 +48,7 @@ class APump():
         # OB1_Initialization
         Instr_ID=c_int32()
         print("Instrument name and regulator types are hardcoded in the Python script")
-        error=OB1_Initialization('COM7'.encode('ascii'),1,2,4,3,byref(Instr_ID))
+        error=OB1_Initialization('COM6'.encode('ascii'),1,2,4,3,byref(Instr_ID))
         #all functions will return error codes to help you to debug your code, for further information refer to User Guide
         print('error:%d' % error)
         print("OB1 ID: %d" % Instr_ID.value)
@@ -78,10 +79,11 @@ class APump():
         PID_Set_Running_Remote(Instr_ID.value,1,1)
         # Change P and I settings--currently set to 10 and 0.1
         # used 0.3-0.5
-        #PID_Set_Params_Remote(Instr_ID.value,1,1,P,I)
+        PID_Set_Params_Remote(Instr_ID.value,1,1,8,1)
         #
 
         self.pump_ID = Instr_ID.value # set to whatever is returned by _Initialization; check that it is not -1
+        self.BFS_ID = BFS_ID.value
 
 
     def calibratePump(self):
@@ -109,9 +111,19 @@ class APump():
 
             return [self.flow_status, self.speed]
         data_sens=c_double()
-        data_reg=c_double()
-        error=OB1_Get_Remote_Data(self.pump_ID,self.set_channel, byref(data_reg),byref(data_sens))
+        data_dens=c_double()
+        data_temp=c_double()
+        error=BFS_Get_Remote_Data(self.BFS_ID, byref(data_sens),byref(data_dens),byref(data_temp))
         self.speed = data_sens.value
+
+        #data_sens=c_double()
+        #data_reg=c_double()
+        #flow=c_double(-1)
+        #error=BFS_Get_Flow(self.BFS_ID,byref(flow))
+        #self.speed = flow.value
+
+        #error=OB1_Get_Remote_Data(self.pump_ID,self.set_channel, byref(data_reg),byref(data_sens))
+        #self.speed = data_sens.value
         if self.speed == 0:
             self.flow_status = "Stopped"
         else:
@@ -130,6 +142,7 @@ class APump():
             print("Closed simulated OB1 pump.")
             
             return
+        error=BFS_Stop_Remote_Measurement(self.BFS_ID)
         error=OB1_Stop_Remote_Measurement(self.pump_ID)
         error=OB1_Destructor(self.pump_ID)
         # TODO OB1_Stop_Remote_Measurement
@@ -166,7 +179,11 @@ class APump():
         if self.simulate:
             self.flow_status = "Stopped"
 
+        set_channel=int(self.set_channel)#convert to int
+        set_channel=c_int32(set_channel)#convert to c_int32
+        error=OB1_Set_Remote_Target(self.pump_ID, set_channel, 0)
         self.setSpeed(0.0)
+        #error=BFS_Zeroing(self.BFS_ID)
 
 
 #
