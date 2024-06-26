@@ -82,6 +82,7 @@ class CameraQPDScanThread(QtCore.QThread):
         for _ in range(reps):
             # Make the single fit request
             fit_result = self.fit.singleQpdScan(self.camera.getImage())
+            print('Offset: ' + str(fit_result.offset))
 
             # Calcualte the aggregate results
             power_total += fit_result.power
