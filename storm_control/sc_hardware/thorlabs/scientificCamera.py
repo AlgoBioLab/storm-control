@@ -2,6 +2,7 @@ import numpy as np
 from typing import Tuple
 import os
 import sys
+import cv2
 
 from storm_control.hal4000.qpdEmulation.cameraInterface import Camera
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
@@ -61,7 +62,7 @@ class ScientificCamera(Camera):
         self.camera.frames_per_trigger_zero_for_unlimited = 0
         self.camera.image_poll_timeout_ms = self.timeout
 
-        self.camera.roi = (1200, 400, 1280, 480)
+        self.camera.roi = (310, 560, 514, 764)
         self.max_height = self.camera.image_height_pixels
         self.max_width = self.camera.image_width_pixels
 
@@ -73,6 +74,11 @@ class ScientificCamera(Camera):
         # by the camera
         self.max_empty_frames = 5
         self.num_empty_frames = 0
+
+        # Keep a frame history a background image for use in the processing
+        self.bg_image = cv2.imread("C:/Users/RPI/Desktop/background.jpg")
+        self.bg_image = cv2.cvtColor(self.bg_image, cv2.COLOR_BGR2GRAY)
+        print(self.bg_image.shape)
 
     def getImage(self) -> np.ndarray:
         if not self.sdk._is_sdk_open:
@@ -90,6 +96,20 @@ class ScientificCamera(Camera):
                 return np.zeros((self.height, self.width))
         self.num_empty_frames = 0
         image = np.copy(frame.image_buffer).astype('uint8')
+        ###
+        # Parameters to tweak detection algorithm
+        threshold_value = 40
+
+        video_gray = image
+        
+        # Compute the absolute difference between the current frame and the background image
+        fg_mask = cv2.absdiff(video_gray, self.bg_image)
+        fg_mask = cv2.GaussianBlur(fg_mask, ksize=(5, 5), sigmaX=1)
+        
+        # Threshold the difference to create a binary mask
+        _, fg_mask = cv2.threshold(fg_mask, threshold_value, 255, cv2.THRESH_BINARY)
+        fg_mask = cv2.GaussianBlur(fg_mask, ksize=(11, 11), sigmaX=20)
+        image = fg_mask
 
         return image
 
