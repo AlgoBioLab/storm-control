@@ -2,6 +2,7 @@ import numpy as np
 from typing import Tuple
 import os
 import sys
+import cv2
 
 from storm_control.hal4000.qpdEmulation.cameraInterface import Camera
 from thorlabs_tsi_sdk.tl_camera import TLCameraSDK
@@ -76,6 +77,9 @@ class ScientificCamera(Camera):
             # TODO: More cleanly handle failed frame grabs
             raise 'Failed to get a frame'
         image = np.copy(frame.image_buffer).astype('uint8')
+        image = cv2.GaussianBlur(image,ksize=(9,9),sigmaX=13)
+        pthresh = np.percentile(image.flatten(),98.75)
+        _,image = cv2.threshold(image,pthresh,255,cv2.THRESH_BINARY)
 
         # Conver to uint8
         return image
