@@ -2,7 +2,7 @@
 # ----------------------------------------------------------------------------------------
 # Elveflow OB1 MK4 pressure & vacuum flow controller
 # ----------------------------------------------------------------------------------------
-
+#python kilroy.py ~/Desktop/AlgoBioLab/storm-configs/kilroy/kilroy_settings.xml
 # TODO: for dlls:
 import ctypes
 import sys
@@ -50,7 +50,7 @@ class APump():
         print("Instrument name and regulator types are hardcoded in the Python script")
         error=OB1_Initialization('COM6'.encode('ascii'),1,2,4,3,byref(Instr_ID))
         #all functions will return error codes to help you to debug your code, for further information refer to User Guide
-        print('error:%d' % error)
+        print('OB1 init error:%d' % error)
         print("OB1 ID: %d" % Instr_ID.value)
         #error=OB1_Add_Sens(Instr_ID, 1, 4, 1, 0, 7, 0) # TODO fix parameters
         ##(CustomSens_Voltage_5_to_25 only works with CustomSensors and OB1 from 2020 and after)
@@ -61,17 +61,18 @@ class APump():
         #see User Guide and NIMAX to determine the instrument name 
         error=BFS_Initialization("ASRL11::INSTR".encode('ascii'),byref(BFS_ID))
         #all functions will return error codes to help you to debug your code, for further information refer to User Guide
-        print('error:%d' % error)
+        print('BFS init error:%d' % error)
         print("BFS ID: %d" % BFS_ID.value)
-        #error1 = BFS_Get_Density(Instr_ID.value,byref(density))
-        #error2 = BFS_Get_Flow(Instr_ID.value,byref(flow))
+        #error1 = BFS_Get_Density(BFS_ID.value,byref(density))
+        #error2 = BFS_Get_Flow(BFS_ID.value,byref(flow))
         #print(error1)
         #print(error2)
         # add remote PID
-        PID_Add_Remote(Instr_ID.value, 1, BFS_ID.value, 1,10,0.1,1)
+        # params:  PID_Add_Remote(Regulator_ID,Regulator_Channel_1_to_4,ID_Sensor,Sensor_Channel_1_to_4,P, I,Running);
+        pidaddremoteerr = PID_Add_Remote(Instr_ID.value, 1, BFS_ID.value, 1,10,0.1,1)
+        print("PID add remote err: " + str(pidaddremoteerr))
         # Start Remote Measurement
         Calib=(c_double*1000)()
-        
         
         BFS_Start_Remote_Measurement(BFS_ID.value)
         OB1_Start_Remote_Measurement(Instr_ID.value, byref(Calib), 1000)
@@ -79,11 +80,15 @@ class APump():
         PID_Set_Running_Remote(Instr_ID.value,1,1)
         # Change P and I settings--currently set to 10 and 0.1
         # used 0.3-0.5
-        PID_Set_Params_Remote(Instr_ID.value,1,1,8,1)
+        # params: PID_Set_Params_Remote(Regulator_ID,Channel_1_to_4,Reset,P, I)
+        # ***** !!! 8/27: Set P=10 and I=0.001 !!! ******
+        piderr = PID_Set_Params_Remote(Instr_ID.value,1,1,10,0.001)
+        print("PID set params err:" + str(piderr))
         #
 
         self.pump_ID = Instr_ID.value # set to whatever is returned by _Initialization; check that it is not -1
         self.BFS_ID = BFS_ID.value
+        return 
 
 
     def calibratePump(self):
@@ -98,7 +103,8 @@ class APump():
         error=Elveflow_Calibration_Default(byref(Calib),1000)
         #for i in range (0,1000):
         #    print('[',i,']: ',Calib[i])
-        repeat = False
+
+        return
         # See also Elveflow_Calibration_[Default,Save,Load]
         # May have to stop remote workflow, calibrate, and then restart remote workflow
         # Otherwise, would have to check if loop is active on every setSpeed - not sure if possible/practical
@@ -145,6 +151,7 @@ class APump():
         error=BFS_Stop_Remote_Measurement(self.BFS_ID)
         error=OB1_Stop_Remote_Measurement(self.pump_ID)
         error=OB1_Destructor(self.pump_ID)
+        return
         # TODO OB1_Stop_Remote_Measurement
         # TODO OB1_Destructor
 
@@ -152,11 +159,16 @@ class APump():
     def setSpeed(self, speed):
         if self.verbose: print("Setting pump speed to " + str(speed))
 
+
         if self.simulate:
             self.speed = speed
         set_channel=int(self.set_channel)#convert to int
         set_channel=c_int32(set_channel)#convert to c_int32
-        error=OB1_Set_Remote_Target(self.pump_ID, set_channel, speed)
+        set_target=float(speed) 
+        set_target=c_double(set_target)#convert to c_double
+        error=OB1_Set_Remote_Target(self.pump_ID, set_channel, set_target)
+        print(error)
+        return
             
 
         # TODO
@@ -173,6 +185,7 @@ class APump():
             self.flow_status = "Flowing"
 
         self.setSpeed(speed)
+        return
 
 
     def stopFlow(self):
@@ -181,8 +194,11 @@ class APump():
 
         set_channel=int(self.set_channel)#convert to int
         set_channel=c_int32(set_channel)#convert to c_int32
+        #error=OB1_Stop_Remote_Measurement(self.pump_ID)
+        print("Stopping Flow")
         error=OB1_Set_Remote_Target(self.pump_ID, set_channel, 0)
-        self.setSpeed(0.0)
+        self.setSpeed(0)
+        return
         #error=BFS_Zeroing(self.BFS_ID)
 
 
