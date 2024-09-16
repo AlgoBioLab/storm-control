@@ -72,8 +72,13 @@ class ScientificCamera(Camera):
         # This count is to handle how many empty frames can be sent.
         # Empty frames are generated when a frame is not retrieved
         # by the camera
-        self.max_empty_frames = 5
+        self.max_empty_frames = 20
         self.num_empty_frames = 0
+
+        self.x_start = 0
+        self.y_start = 0
+        self.width = 0
+        self.height = 0
 
     def getImage(self) -> np.ndarray:
         if not self.sdk._is_sdk_open:
@@ -107,6 +112,10 @@ class ScientificCamera(Camera):
         return [self.x_start, self.y_start, self.width, self.height]
 
     def setAOI(self, x_start: int, y_start: int, width: int, height: int) -> None:
+
+        if ((self.x_start, self.y_start, self.width, self.height) == (x_start, y_start, width, height)):
+            return
+
         self.camera.disarm()
         self.x_start = x_start
         self.y_start = y_start
