@@ -8,6 +8,8 @@ import storm_control.hal4000.halLib.halMessage as halMessage
 from storm_control.hal4000.qpdEmulation.cameraInterface import Camera
 from storm_control.hal4000.qpdEmulation.cameraQPDFit import CameraQPDFitResults
 
+import datetime
+
 
 class CameraQPDScanThread(QtCore.QThread):
     """
@@ -30,6 +32,11 @@ class CameraQPDScanThread(QtCore.QThread):
         self.reps = reps
         self.units_to_microns = units_to_microns
         self.running = False
+        
+        # BEGIN TEST CODE
+        with open('C:/Users/RPI/Desktop/offsets.csv', 'w') as offsetFile:
+            offsetFile.write('time,value\n')
+        # END TEST CODE
 
     def isRunning(self):
         """
@@ -82,7 +89,13 @@ class CameraQPDScanThread(QtCore.QThread):
         for _ in range(reps):
             # Make the single fit request
             fit_result = self.fit.singleQpdScan(self.camera.getImage())
-            print('Offset: ' + str(fit_result.offset))
+
+            # BEGIN TEST CODE
+            now = datetime.datetime.now()
+            formatted = now.strftime('%Y-%m-%dT%H:%M:%S.%f')
+            with open('C:/Users/RPI/Desktop/offsets.csv', 'a') as offsetFile:
+                offsetFile.write(f'{formatted},{fit_result.offset}\n')
+            # END TEST CODE
 
             # Calcualte the aggregate results
             power_total += fit_result.power

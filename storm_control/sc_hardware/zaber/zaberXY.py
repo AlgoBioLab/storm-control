@@ -10,6 +10,7 @@ import traceback
 import storm_control.sc_hardware.serial.RS232 as RS232
 import storm_control.sc_library.hdebug as hdebug
 
+import datetime
 
 class ZaberXYRS232(RS232.RS232):
     """
@@ -31,6 +32,11 @@ class ZaberXYRS232(RS232.RS232):
         del kwds["stage_id"]
         del kwds["unit_to_um"]
         del kwds["limits_dict"]
+
+        # BEGIN TEST CODE
+        with open('C:/Users/RPI/Desktop/stage.csv', 'w') as offsetFile:
+            offsetFile.write('time,x,y\n')
+        # END TEST CODE
 
         # RS232 stuff
         try:
@@ -110,6 +116,12 @@ class ZaberXYRS232(RS232.RS232):
         response_parts = response.split(" ")
         try:
             [sx, sy] = map(float, response_parts[5:])
+            # BEGIN TEST CODE
+            now = datetime.datetime.now()
+            formatted = now.strftime('%Y-%m-%dT%H:%M:%S.%f')
+            with open('C:/Users/RPI/Desktop/stage.csv', 'a') as offsetFile:
+                offsetFile.write(f'{formatted},{sx*self.unit_to_um},{sy*self.unit_to_um}\n')
+            # END TEST CODE
         except ValueError:
             return [None, None]
         return [sx*self.unit_to_um,sy*self.unit_to_um]
