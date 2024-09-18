@@ -82,7 +82,7 @@ class APump():
         # used 0.3-0.5
         # params: PID_Set_Params_Remote(Regulator_ID,Channel_1_to_4,Reset,P, I)
         # ***** !!! 8/27: Set P=10 and I=0.001 !!! ******
-        piderr = PID_Set_Params_Remote(Instr_ID.value,1,1,10,0.001)
+        piderr = PID_Set_Params_Remote(Instr_ID.value,1,1,4,0.001)
         print("PID set params err:" + str(piderr))
         #
 

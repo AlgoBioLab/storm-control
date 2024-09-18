@@ -89,19 +89,11 @@ class AValveChain(AbstractValve):
             return
 
         # MUX_DRI_Set_Valve
-        Valve_ID=int()
-        if valve_ID=='1':
-            Valve_ID=self.valve_dri_ids[0]
-        if valve_ID=='2':
-            Valve_ID=self.valve_dri_ids[1]
-        if valve_ID=='3':
-            Valve_ID=self.valve_dri_ids[2]
-        
-        port_ID=int(port_ID)
+        port_ID=int(port_ID+1)
         port_ID=c_int32(port_ID)
-        print(Valve_ID)
+        print(valve_ID)
         print(port_ID)
-        error=MUX_DRI_Set_Valve(Valve_ID,port_ID,direction)
+        error=MUX_DRI_Set_Valve(valve_ID,port_ID,direction)
 
 
     def howManyValves(self):
